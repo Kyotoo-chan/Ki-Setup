@@ -7,18 +7,12 @@
 # Skills — nur nutzen wenn Frage in diese Richtung geht
 | Aufgabe | Skill |
 |---|---|
-| Code-Review, Bugfix | `/codereview` · `/codex:review` · `/codex:adversarial-review` |
+| Code-Review, Bugfix | `/code-review:code-review` · `/codex:review` · `/codex:adversarial-review` |
 | Task delegieren | `/codex:rescue` |
 | Frontend / UI | `/frontend-design` |
 | Web-Recherche | `/firecrawl` |
-| Sicherheitsanalyse | `/security-guidance` |
 
-# Ki-Setup — Projektkontext
-
-## Zweck
-Blueprint-Repository für Claude Code. Enthält globale Direktiven, Settings und Projekt-Templates.
-
-## Dateistruktur
+# Dateistruktur
 | Pfad | Inhalt |
 |---|---|
 | `.claude/settings.json` | autocompact 75%, BASH_MAX_OUTPUT_LENGTH 150000 |
@@ -28,7 +22,7 @@ Blueprint-Repository für Claude Code. Enthält globale Direktiven, Settings und
 | `templates/CLAUDE.project.md` | Karpathy-Guidelines als Startvorlage |
 | `~/.claude/statusline-command.sh` | Statusleiste (bash + jq) |
 
-## Konventionen
+# Konventionen
 - `settings.json` immer mit `jq . <file>` validieren vor commit
 - Hooks testen: JSON auf stdin pipen, exit-code + Seiteneffekt prüfen
 - Templates liegen in `templates/`, nicht in `.claude/`
