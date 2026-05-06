@@ -1,78 +1,113 @@
-# ki-setup — Claude Code Blueprint
+# Agentic Coding Setup
 
-## Installation
+Dieses Coding-Setup ist für **Windows 11** gedacht und benönigt eine [Node.js](https://nodejs.org/dist/v24.15.0/node-v24.15.0-x64.msi)-Installation.  
+Seit April werden keine Claude-Subscription Verknüpfungen Drittanbieter bereitgestellt und es werden nur noch extra Api-Keys akzeptiert.
 
-PowerShell
-```powershell
-irm https://claude.ai/install.ps1 | iex
-```
-CMD
-```cmd
-curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd
-```
+> Das Setup ist Modellunabhängig: alle wichtigen Projektregeln liegen in [`AGENTS.md`](./AGENTS.md) und können Projekt spezifisch erweitert werden.  
 
 ---
 
-## Struktur
+## Schnellstart
 
+```bash
+git clone https://github.com/Kyotoo-chan/Ki-Setup.git
 ```
-ki-setup/
-├── .claude/
-│   └── settings.json       # Autocompact + Bash-Output-Limit
-├── CLAUDE.md               # Globale Claude-Direktiven (Stil, Skills)
-├── templates/
-│   └── CLAUDE.project.md   # Karpathy-Guidelines als Projekt-Template
-└── README.md
+```bash
+cd Ki-Setup
 ```
+```bash
+npm install -g @mariozechner/pi-coding-agent
+```
+```bash
+pi
+```
+```bash
+/login
+```
+Passenden Provider auswählen und dann **nicht** den link per `strg+klick` **öffnen**!  
+Stattdessen den Link kopieren und im Brower **händisch alle Leerzeichen entfernen**.
 
 ---
 
-## Plugins
-
-### Codex
-Repo: [github.com/openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc)  
-Voraussetzung: [Node.js ≥ 18.18](https://nodejs.org/en/download) + ChatGPT-Abo oder OpenAI API Key
+## Repo-Struktur
 
 ```
-/plugin install codex@openai-codex
-/codex:setup
+ai-setup/
+├── README.md
+├── AGENTS.md            ← Regelwerk des Repositorys
+├── CLAUDE.md            ← Claude-Variante, verweist auf AGENTS.md
+├── agents/              ← Spezialisierte Agent-Profile (backend-, frontend-architect ...)
+├── skills/              ← Auto-invokierte Workflows
+├── settings/            ← Globale Pi-Settings
+└── claude/              ← Optionales Claude-only Kompakt-Setup (genaueres in internen README)
 ```
-
-| Befehl | Funktion |
-|---|---|
-| `/codex:review` | Code-Review via Codex |
-| `/codex:adversarial-review` | Kritisches Review |
-| `/codex:rescue` | Task an Codex delegieren |
-| `/codex:status` | Status laufender Tasks |
-| `/codex:result` | Ergebnis abrufen |
-| `/codex:cancel` | Task abbrechen |
-
-### Weitere Plugins (aus `/plugin`)
-`frontend-design` · `firecrawl` · `codereview` · `security-guidance`
+Jeder Unterordner hat eine eigene `README.md` mit genaueren Details.
 
 ---
 
-## Settings (`.claude/settings.json`)
+## Kerndateien
 
-| Key | Wert | Effekt |
-|---|---|---|
-| `autocompact_percentage_override` | `75` | Komprimierung bei 75% Kontextauslastung |
-| `BASH_MAX_OUTPUT_LENGTH` | `150000` | Längere Bash-Outputs ohne Abschneiden |
-
----
-
-## Neues Projekt einrichten
-
-1. `templates/CLAUDE.project.md` → in Projektroot als `CLAUDE.md` kopieren
-2. Projektspezifischen Kontext ergänzen (Stack, Konventionen, wichtige Pfade)
+| Datei | Zweck |
+|-------|-------|
+| [`AGENTS.md`](./AGENTS.md) | Regelwerk für **alle** Agent innerhalb des Repositorys. |
+| [`CLAUDE.md`](./CLAUDE.md) | Claude benötigt eine spezifische Variante. Verweist dabei jedoch nur auf AGENTS.md, damit nichts doppelt gepflegt wird. |
 
 ---
 
-## Tools
+## Verknüpfte Tools & Abos
 
-- **Obsidian + graphify** — [github.com/safishamsi/graphify](https://github.com/safishamsi/graphify)  
-  Verwandelt Repo in `.md`-Dateien für token-effiziente Verarbeitung
-- **Awesome Design MD** — [github.com/VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md)
+Alle Tools/Abos werden über **Pi** als zentralen Coding-Agenten genutzt.
 
-# Anitgravity
-[Antigravity Download Link](https://antigravity.google/download)
+| Tool | Zweck | Link |
+|------|-------|------|
+| **Pi Coding Agent** | Haupt-Coding-Agent  | [pi.dev](https://pi.dev) |
+| **Claude Modelle** | Anthropic Sonnet/Opus für Code & Reasoning | [claude.ai](https://claude.ai) |
+| **ChatGPT Modelle** | OpenAI GPT-Modelle | [chatgpt.com](https://chatgpt.com) |
+| **GitHub Copilot** | Zugriff auf alle auf GitHub verfügbaren Modellen  | [github.com/features/copilot](https://github.com/features/copilot) |
+| **Awesome Design MD**| Bietet Markdownvorlagen für unterschiedlicheste Webdesigns | [github.com/VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md)|
+
+---
+Claude oder Codex können auch mittels der folgenden Extensions in **Visual Studio Code**, anstatt eines Terminals, genutzt werden:
+- Claude Code for VS Code
+- Codex – OpenAI's coding agent
+---
+
+## Settings
+
+Folgende Werte sind in meinem Pi-Setup gesetzt:
+
+| Setting | Wert | Zweck |
+|---------|------|-------|
+| `autocompact_percentage_override` | `75` | Komprimierung bei 75 % Kontextauslastung, um eine bessere Performance des Modells zu gwährleisten und das Contextfenster zu verkleinern  |
+
+Details → [`settings/pi.md`](./settings/pi.md)
+
+---
+
+## Eigene Befehle
+
+Diese Befehle sind standartmäßig nicht Teil von Pi und wurden selbst hinzugefügt. In Claude existieren diese bereits.  
+
+Pi kann, per Chatanfrage, die folgenden zusätzlichen Befehle welche unter [`extentions`](./extentions/) bereitgestellt werden permanent zu den User-Extensions hinzufügen.  
+Wobei diese, mit Hilfe von Pi, jederzeit überarbeitet oder entfernt werden können. Diese sind in Claude bereits implementiert und Standard.
+
+| Befehl | Funktion | Quelle |
+|--------|----------|--------|
+| `/btw` | Schneller Hinweis/Kontext-Einwurf |  [`extentions/btw.ts`](./extentions/btw.ts) |
+| `/planmode` | Erst planen, dann implementieren | [`extentions/planmode.ts`](./extentions/planmode.ts) |
+| `/model` | Modellwechsel **+ einstellen der Denktiefe** | [`extentions/model-selector.ts`](./extentions/model-selector.ts) |
+
+---
+
+### Modell- & Denktiefen-Strategie
+
+- Als **Standard-Denktiefe** wird `medium` bis manchmal `high` verwendet
+- Als **Standard-Modell** wird **Anthropic-Sonnet-(aktuellste Version)** für normales Coding genutzt
+- **Anthropic-Opus-(aktuellste Version)** nur bei sehr komplexen Aufgaben wie Architektur-Entscheidungen, schwierige Bugfixes und großen Code-Reviews
+
+
+## Hinweis zum Ordner `claude/`
+
+[`claude/`](./claude) enthält ein **eigenständiges, kompaktes Setup** speziell für Claude.
+Es ist **unabhängig** vom Rest des Repos und nur dann relevant, wenn man ausschließlich mit Claude arbeite möchte.
+Eine ausführliche Beschreibung befindet sich unter [`claude/README.md`](./claude/README.md).
