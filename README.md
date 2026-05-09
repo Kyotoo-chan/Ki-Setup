@@ -33,13 +33,11 @@ Stattdessen den Link kopieren und im Brower **händisch alle Leerzeichen entfern
 
 ```
 ai-setup/
-├── README.md
-├── AGENTS.md            ← Regelwerk des Repositorys
-├── CLAUDE.md            ← Claude-Variante, verweist auf AGENTS.md
 ├── agents/              ← Spezialisierte Agent-Profile (backend-, frontend-architect ...)
-├── skills/              ← Auto-invokierte Workflows
-├── settings/            ← Globale Pi-Settings
-└── claude/              ← Optionales Claude-only Kompakt-Setup (genaueres in internen README)
+├── claude/              ← Optionales Claude-only Kompakt-Setup (genaueres in internen README)
+├── extensions/          ← Fügt die unten beschriebenen zusätzlichen Befehle und eine leicht veränderte Ui hinzu
+├── AGENTS.md            ← Regelwerk des Repositorys
+└── README.md
 ```
 Jeder Unterordner hat eine eigene `README.md` mit genaueren Details.
 
@@ -74,13 +72,12 @@ Claude oder Codex können auch mittels der folgenden Extensions in **Visual Stud
 
 ## Settings
 
-Folgende Werte sind in meinem Pi-Setup gesetzt:
+Folgende Werte werden durch die Extension usage-footer (sonst nur für das Aussehen des Terminals relevant) gesetzt:
 
 | Setting | Wert | Zweck |
 |---------|------|-------|
 | `autocompact_percentage_override` | `75` | Komprimierung bei 75 % Kontextauslastung, um eine bessere Performance des Modells zu gwährleisten und das Contextfenster zu verkleinern  |
 
-Details → [`settings/pi.md`](./settings/pi.md)
 
 ---
 
