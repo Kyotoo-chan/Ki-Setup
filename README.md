@@ -1,7 +1,7 @@
 # Agentic Coding Setup
 
 Dieses Coding-Setup ist für **Windows 11** gedacht und benönigt eine [Node.js](https://nodejs.org/dist/v24.15.0/node-v24.15.0-x64.msi)-Installation.  
-Seit April werden keine Claude-Subscription Verknüpfungen Drittanbieter bereitgestellt und es werden nur noch extra Api-Keys akzeptiert.
+Seit April können Claude-Subscriptions nicht mit Drittanbieter-Tools genutzt werden und die Claude-Modelle sind nur per Api-Key erreichbar.
 
 > Das Setup ist Modellunabhängig: alle wichtigen Projektregeln liegen in [`AGENTS.md`](./AGENTS.md) und können Projekt spezifisch erweitert werden.  
 
@@ -35,11 +35,10 @@ Stattdessen den Link kopieren und im Brower **händisch alle Leerzeichen entfern
 ai-setup/
 ├── agents/              ← Spezialisierte Agent-Profile (backend-, frontend-architect ...)
 ├── claude/              ← Optionales Claude-only Kompakt-Setup (genaueres in internen README)
-├── extensions/          ← Fügt die unten beschriebenen zusätzlichen Befehle und eine leicht veränderte Ui hinzu
+├── extensions/          ← Erweiterungen für den Coding Agenten Pi
 ├── AGENTS.md            ← Regelwerk des Repositorys
 └── README.md
 ```
-Jeder Unterordner hat eine eigene `README.md` mit genaueren Details.
 
 ---
 
@@ -54,11 +53,10 @@ Jeder Unterordner hat eine eigene `README.md` mit genaueren Details.
 
 ## Verknüpfte Tools & Abos
 
-Alle Tools/Abos werden über **Pi** als zentralen Coding-Agenten genutzt.
-
 | Tool | Zweck | Link |
 |------|-------|------|
-| **Pi Coding Agent** | Haupt-Coding-Agent  | [pi.dev](https://pi.dev) |
+| **Pi Coding Agent** | Coding-Agent  | [pi.dev](https://pi.dev) |
+| **Claude Code** | Coding-Agent  | [pi.dev](https://pi.dev) |
 | **Claude Modelle** | Anthropic Sonnet/Opus für Code & Reasoning | [claude.ai](https://claude.ai) |
 | **ChatGPT Modelle** | OpenAI GPT-Modelle | [chatgpt.com](https://chatgpt.com) |
 | **GitHub Copilot** | Zugriff auf alle auf GitHub verfügbaren Modellen  | [github.com/features/copilot](https://github.com/features/copilot) |
@@ -76,14 +74,12 @@ Folgende Werte werden durch die Extension usage-footer (sonst nur für das Ausse
 
 | Setting | Wert | Zweck |
 |---------|------|-------|
-| `autocompact_percentage_override` | `75` | Komprimierung bei 75 % Kontextauslastung, um eine bessere Performance des Modells zu gwährleisten und das Contextfenster zu verkleinern  |
+| `autocompact_percentage_override` | `75` | Komprimierung bei 75 % Kontextauslastung, um eine bessere Performance des Modells zu gewährleisten und das Contextfenster zu verkleinern  |
 
 
 ---
 
-## Eigene Befehle
-
-Diese Befehle sind standartmäßig nicht Teil von Pi und wurden selbst hinzugefügt. In Claude existieren diese bereits.  
+## Eigene Pi Befehle
 
 Pi kann, per Chatanfrage, die folgenden zusätzlichen Befehle welche unter [`extentions`](./extentions/) bereitgestellt werden permanent zu den User-Extensions hinzufügen.  
 Wobei diese, mit Hilfe von Pi, jederzeit überarbeitet oder entfernt werden können. Diese sind in Claude bereits implementiert und Standard.
@@ -99,12 +95,12 @@ Wobei diese, mit Hilfe von Pi, jederzeit überarbeitet oder entfernt werden kön
 ### Modell- & Denktiefen-Strategie
 
 - Als **Standard-Denktiefe** wird `medium` bis manchmal `high` verwendet
-- Als **Standard-Modell** wird **Anthropic-Sonnet-(aktuellste Version)** für normales Coding genutzt
-- **Anthropic-Opus-(aktuellste Version)** nur bei sehr komplexen Aufgaben wie Architektur-Entscheidungen, schwierige Bugfixes und großen Code-Reviews
+- Als **Standard-Modell** wird **Anthropic-Sonnet-(aktuellste Version)** oder **Opanais GPT-(vorgänger der aktuellsten Version)** für normales Coding genutzt
+- **Anthropic-Opus-(aktuellste Version)** oder **OpenAi GPT-(aktuellstes Version)** nur bei sehr komplexen Aufgaben wie Architektur-Entscheidungen, schwierige Bugfixes und großen Code-Reviews
 
 
 ## Hinweis zum Ordner `claude/`
 
 [`claude/`](./claude) enthält ein **eigenständiges, kompaktes Setup** speziell für Claude.
-Es ist **unabhängig** vom Rest des Repos und nur dann relevant, wenn man ausschließlich mit Claude arbeite möchte.
+Es ist **unabhängig** vom Rest des Repos und nur dann relevant, wenn man ausschließlich mit Claude arbeiten möchte.
 Eine ausführliche Beschreibung befindet sich unter [`claude/README.md`](./claude/README.md).
