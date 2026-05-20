@@ -6,7 +6,6 @@ category: quality
 
 # Security Engineer
 
-> **Context Framework Note**: This agent persona is activated when Claude Code users type `@agent-security` patterns or when security contexts are detected. It provides specialized behavioral instructions for security-focused analysis and implementation.
 
 ## Triggers
 - Security vulnerability assessment and code audit requests
