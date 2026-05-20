@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Box, Key, Text } from "@mariozechner/pi-tui";
+import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { Box, Key, Text, matchesKey } from "@mariozechner/pi-tui";
 
 const PLAN_FILE = ".pi/plan.md";
 const PLANNING_TOOLS = ["read", "bash", "write"];
@@ -128,6 +128,7 @@ type PlanMessageDetails = {
 	path?: string;
 	hint?: string;
 	task?: string;
+	title?: string;
 };
 
 function stripInlineMarkdown(text: string): string {
@@ -175,7 +176,7 @@ function renderPlanLine(line: string, inFence: boolean, theme: ExtensionContext[
 
 function formatPlanForDisplay(plan: string, details: PlanMessageDetails | undefined, theme: ExtensionContext["ui"]["theme"]): string {
 	const lines = [
-		theme.bold(theme.fg("customMessageLabel", "plan")),
+		theme.bold(theme.fg("customMessageLabel", details?.title || "plan")),
 		theme.fg("muted", details?.path || PLAN_FILE),
 	];
 
@@ -199,6 +200,26 @@ function formatPlanForDisplay(plan: string, details: PlanMessageDetails | undefi
 	}
 
 	return lines.join("\n");
+}
+
+class PlanModeEditor extends CustomEditor {
+	constructor(
+		tui: ConstructorParameters<typeof CustomEditor>[0],
+		theme: ConstructorParameters<typeof CustomEditor>[1],
+		keybindings: ConstructorParameters<typeof CustomEditor>[2],
+		private isPlanModeActive: () => boolean,
+		private onShowPlan: () => void,
+	) {
+		super(tui, theme, keybindings);
+	}
+
+	handleInput(data: string): void {
+		if (matchesKey(data, Key.ctrl("p"))) {
+			if (this.isPlanModeActive()) this.onShowPlan();
+			return;
+		}
+		super.handleInput(data);
+	}
 }
 
 export default function planModeExtension(pi: ExtensionAPI) {
@@ -257,13 +278,59 @@ export default function planModeExtension(pi: ExtensionAPI) {
 
 		const planRequest = [
 			`Plan this task before implementation: ${taskPrompt}`,
-			`Work in planning mode only. Inspect the codebase read-only, ask clarifying questions if needed, and write the plan to ${PLAN_FILE}.`,
-			`The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.`,
-			`Do not edit any file except ${PLAN_FILE}. After writing the plan, stop and wait for the user's next message.`,
+			`Work in planning mode only. Inspect the codebase read-only and identify missing information first.`,
+			`If anything is ambiguous, risky, or underspecified, ask clarifying questions first and stop. Do not write ${PLAN_FILE} before those questions are answered.`,
+			`Only when there are no open questions, write the plan to ${PLAN_FILE}. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.`,
+			`Do not edit any file except ${PLAN_FILE}. After asking questions or after writing the plan, stop and wait for the user's next message.`,
 		].join("\n\n");
 
 		if (ctx.isIdle()) pi.sendUserMessage(planRequest);
 		else pi.sendUserMessage(planRequest, { deliverAs: "steer" });
+	}
+
+	function extractOpenQuestions(plan: string): string[] {
+		const lines = plan.replace(/\r\n/g, "\n").split("\n");
+		const questions: string[] = [];
+		let inOpenQuestions = false;
+		let inFence = false;
+
+		for (const line of lines) {
+			if (/^\s*```/.test(line)) {
+				inFence = !inFence;
+				continue;
+			}
+			if (inFence) continue;
+
+			const heading = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
+			if (heading) {
+				const title = stripInlineMarkdown(heading[2]).trim().toLowerCase();
+				inOpenQuestions = title === "open questions" || title === "questions";
+				continue;
+			}
+
+			if (!inOpenQuestions) continue;
+			const trimmed = line.trim();
+			if (!trimmed) continue;
+
+			const checkbox = trimmed.match(/^[-*]\s+\[ \]\s+(.*)$/i);
+			if (checkbox) {
+				questions.push(stripInlineMarkdown(checkbox[1]).trim());
+				continue;
+			}
+
+			const bullet = trimmed.match(/^[-*+]\s+(.*)$/);
+			if (bullet) {
+				questions.push(stripInlineMarkdown(bullet[1]).trim());
+				continue;
+			}
+
+			const numbered = trimmed.match(/^\d+\.\s+(.*)$/);
+			if (numbered) {
+				questions.push(stripInlineMarkdown(numbered[1]).trim());
+			}
+		}
+
+		return questions.filter(Boolean);
 	}
 
 	function isTextApproval(text: string): boolean {
@@ -321,11 +388,38 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		);
 	}
 
+	async function showOpenQuestions(ctx: ExtensionContext, plan: string) {
+		const questions = extractOpenQuestions(plan);
+		if (questions.length === 0) {
+			ctx.ui.notify("Plan updated. Press Ctrl+P to view it.", "info");
+			return;
+		}
+
+		const content = questions.map((question) => `- [ ] ${question}`).join("\n");
+		pi.sendMessage(
+			{
+				customType: "planmode-plan",
+				content,
+				details: {
+					path: PLAN_FILE,
+					title: "open questions",
+					hint: "Answer the questions, then the plan can be completed. Press Ctrl+P to view the full plan.",
+					task: taskPrompt || undefined,
+				},
+				display: true,
+			},
+			{ triggerTurn: false },
+		);
+		ctx.ui.notify("Open questions updated. Press Ctrl+P to view the full plan.", "info");
+	}
+
 	async function maybeShowPlan(ctx: ExtensionContext) {
 		if (!active) return;
 		const plan = (await readPlan(ctx.cwd))?.trim();
 		if (!plan || plan === lastShownPlan) return;
-		await showPlan(ctx);
+		lastShownPlan = plan;
+		persist();
+		await showOpenQuestions(ctx, plan);
 	}
 
 	async function approvePlan(ctx: ExtensionContext, note?: string) {
@@ -421,6 +515,11 @@ export default function planModeExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
+		ctx.ui.setEditorComponent((tui, theme, keybindings) =>
+			new PlanModeEditor(tui, theme, keybindings, () => active, () => {
+				void showPlan(ctx);
+			}),
+		);
 		const entries = ctx.sessionManager.getEntries();
 		const state = entries
 			.filter((e: { type: string; customType?: string }) => e.type === "custom" && e.customType === "planmode-state")
@@ -441,7 +540,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 			message: {
 				customType: "planmode-context",
 				content:
-					`[PLAN MODE ACTIVE]\nCurrent task: ${taskPrompt || "(will be provided by the user's next message)"}\n\nBefore making any code or file changes, do the following in order:\n1. Analyze the task and inspect the codebase read-only.\n2. Ask clarifying questions for anything ambiguous or risky before implementation.\n3. Write a detailed implementation plan to ${PLAN_FILE} using the write tool. Overwrite that file completely when updating the plan.\n4. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.\n5. Do not edit any file except ${PLAN_FILE}. Do not use write/edit/bash to modify anything else.\n6. After the plan is written, stop and wait for the user's next message.\n7. If the user refines the request, update the plan instead of implementing.\n8. Only start implementation after the user clearly approves the plan.\n\nCurrent working directory: ${ctx.cwd}\nPlan file absolute path: ${planAbs}`,
+					`[PLAN MODE ACTIVE]\nCurrent task: ${taskPrompt || "(will be provided by the user's next message)"}\n\nBefore making any code or file changes, do the following in order:\n1. Analyze the task and inspect the codebase read-only.\n2. Identify missing information first. If anything is ambiguous, risky, or underspecified, ask clarifying questions and stop.\n3. Do not write ${PLAN_FILE} until those questions have been answered or there are genuinely no open questions.\n4. Once there are no open questions, write a detailed implementation plan to ${PLAN_FILE} using the write tool. Overwrite that file completely when updating the plan.\n5. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.\n6. Do not edit any file except ${PLAN_FILE}. Do not use write/edit/bash to modify anything else.\n7. After asking questions or after writing the plan, stop and wait for the user's next message.\n8. If the user refines the request, update the plan instead of implementing.\n9. Only start implementation after the user clearly approves the plan.\n\nCurrent working directory: ${ctx.cwd}\nPlan file absolute path: ${planAbs}`,
 				display: false,
 			},
 		};

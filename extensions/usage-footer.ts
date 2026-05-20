@@ -19,6 +19,18 @@ const AUTO_COMPACT_THRESHOLD_PERCENT = 75;
 
 type LimitWindowId = "5h" | "7d";
 
+type ProviderUsageWindow = {
+  usedPercent: number;
+  resetAt?: number;
+  resetAfterSeconds?: number;
+  windowSeconds?: number;
+};
+
+type ProviderUsageSnapshot = {
+  used5h: ProviderUsageWindow;
+  used7d: ProviderUsageWindow;
+};
+
 type ExactLimitWindow = {
   limit?: number;
   remaining?: number;
@@ -281,6 +293,50 @@ function formatReset(resetAt: number | undefined): string | undefined {
   return new Date(resetAt).toLocaleString();
 }
 
+function formatRelativeDuration(targetAt: number | undefined): string | undefined {
+  if (!targetAt || !Number.isFinite(targetAt)) return undefined;
+  const diffMs = targetAt - Date.now();
+  if (diffMs <= 0) return "now";
+
+  const totalMinutes = Math.round(diffMs / 60000);
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    if (minutes === 0) return `in ${days}d ${hours}h`;
+    return `in ${days}d ${hours}h ${minutes}m`;
+  }
+  if (hours <= 0) return `in ${minutes}m`;
+  if (minutes === 0) return `in ${hours}h`;
+  return `in ${hours}h ${minutes}m`;
+}
+
+function getProviderWindowUsage(rawWindow: any): ProviderUsageWindow | undefined {
+  const usedPercent = rawWindow?.used_percent;
+  if (typeof usedPercent !== "number") return undefined;
+
+  const resetAt = parseResetTimestamp(
+    String(rawWindow?.reset_at ?? ""),
+    Date.now(),
+  );
+  const resetAfterSeconds =
+    typeof rawWindow?.reset_after_seconds === "number"
+      ? rawWindow.reset_after_seconds
+      : undefined;
+  const windowSeconds =
+    typeof rawWindow?.limit_window_seconds === "number"
+      ? rawWindow.limit_window_seconds
+      : undefined;
+
+  return {
+    usedPercent: clampPercent(usedPercent),
+    resetAt,
+    resetAfterSeconds,
+    windowSeconds,
+  };
+}
+
 function formatFooterWindow(
   label: LimitWindowId,
   window: ExactLimitWindow | undefined,
@@ -318,7 +374,7 @@ export default function usageFooterExtension(pi: ExtensionAPI) {
 
   // Usage Polling State
   let isGenerating = false;
-  let providerUsage: { used5h: number; used7d: number } | null = null;
+  let providerUsage: ProviderUsageSnapshot | null = null;
   let usageInterval: ReturnType<typeof setInterval> | null = null;
   let hasNotifiedUsageError = false;
 
@@ -361,10 +417,10 @@ export default function usageFooterExtension(pi: ExtensionAPI) {
         });
         if (!res.ok) throw new Error("Codex usage fetch failed");
         const data = await res.json();
-        const p1 = data?.rate_limit?.primary_window?.used_percent;
-        const p2 = data?.rate_limit?.secondary_window?.used_percent;
-        if (typeof p1 === "number" && typeof p2 === "number") {
-          providerUsage = { used5h: clampPercent(p1), used7d: clampPercent(p2) };
+        const primaryWindow = getProviderWindowUsage(data?.rate_limit?.primary_window);
+        const secondaryWindow = getProviderWindowUsage(data?.rate_limit?.secondary_window);
+        if (primaryWindow && secondaryWindow) {
+          providerUsage = { used5h: primaryWindow, used7d: secondaryWindow };
           return;
         }
       }
@@ -378,10 +434,10 @@ export default function usageFooterExtension(pi: ExtensionAPI) {
         });
         if (!res.ok) throw new Error("Claude usage fetch failed");
         const data = await res.json();
-        const p1 = data?.rate_limit?.primary_window?.used_percent;
-        const p2 = data?.rate_limit?.secondary_window?.used_percent;
-        if (typeof p1 === "number" && typeof p2 === "number") {
-          providerUsage = { used5h: clampPercent(p1), used7d: clampPercent(p2) };
+        const primaryWindow = getProviderWindowUsage(data?.rate_limit?.primary_window);
+        const secondaryWindow = getProviderWindowUsage(data?.rate_limit?.secondary_window);
+        if (primaryWindow && secondaryWindow) {
+          providerUsage = { used5h: primaryWindow, used7d: secondaryWindow };
           return;
         }
       }
@@ -545,13 +601,13 @@ export default function usageFooterExtension(pi: ExtensionAPI) {
           if (quota7d) statsParts.push(theme.fg("dim", quota7d));
 
           if (providerUsage) {
-            const usage5h = `${formatPercent(providerUsage.used5h)}/5h`;
-            const usage7d = `${formatPercent(providerUsage.used7d)}/7d`;
+            const usage5h = `${formatPercent(providerUsage.used5h.usedPercent)}/5h`;
+            const usage7d = `${formatPercent(providerUsage.used7d.usedPercent)}/7d`;
             statsParts.push(
               theme.fg("dim", "[") +
-                colorUsagePercent(usage5h, providerUsage.used5h) +
+                colorUsagePercent(usage5h, providerUsage.used5h.usedPercent) +
                 theme.fg("dim", " ") +
-                colorUsagePercent(usage7d, providerUsage.used7d) +
+                colorUsagePercent(usage7d, providerUsage.used7d.usedPercent) +
                 theme.fg("dim", "]"),
             );
           }
@@ -640,11 +696,11 @@ export default function usageFooterExtension(pi: ExtensionAPI) {
     });
   }
 
-  pi.registerCommand("limit", {
-    description: "Show exact provider limit data when exposed",
+  pi.registerCommand("reset", {
+    description: "Show provider limit reset times when available",
     handler: async (_args, ctx) => {
       syncModel(ctx);
-      const snapshot = getCurrentSnapshot();
+      await fetchProviderUsage(currentModel, ctx);
       const modelLabel = currentModel
         ? `${currentModel.provider}/${currentModel.id}`
         : "none";
@@ -661,15 +717,14 @@ export default function usageFooterExtension(pi: ExtensionAPI) {
         return;
       }
 
-      if (!hasExactData(snapshot)) {
+      if (!providerUsage) {
         pi.sendMessage(
           {
             customType: "usage-footer-limit",
             content:
-              `# /limit\n\n` +
-              `- Model: ${modelLabel}\n` +
-              `- Context auto-compact threshold: ${AUTO_COMPACT_THRESHOLD_PERCENT}%\n\n` +
-              `The current provider does not provide exact 5h/7d limit data to Pi in this session.`,
+              `# /reset\n\n` +
+              `- Model: ${modelLabel}\n\n` +
+              `The current provider does not expose reset times in this session.`,
             display: true,
           },
           { triggerTurn: false },
@@ -677,53 +732,25 @@ export default function usageFooterExtension(pi: ExtensionAPI) {
         return;
       }
 
-      const usage = ctx.getContextUsage();
-      const lines = ["# /limit", "", `- Model: ${modelLabel}`];
-      if (usage?.percent !== null && usage?.percent !== undefined) {
-        lines.push(
-          `- Context usage: ${usage.percent.toFixed(1)}%/${formatTokens(usage.contextWindow)}`,
-        );
-      } else if (usage?.contextWindow) {
-        lines.push(`- Context usage: ?/${formatTokens(usage.contextWindow)}`);
-      }
-      lines.push(
-        `- Context auto-compact threshold: ${AUTO_COMPACT_THRESHOLD_PERCENT}%`,
-        "",
-      );
-
-      for (const windowId of ["5h", "7d"] as LimitWindowId[]) {
-        const window = snapshot.windows[windowId];
-        lines.push(`## ${windowId}`);
-        if (!window) {
-          lines.push(
-            `Exact ${windowId} limit data was not exposed by the provider.`,
-            "",
-          );
-          continue;
-        }
-
-        const usedPercent = getUsedPercent(window);
-        if (usedPercent !== undefined)
-          lines.push(`- Used: ${formatPercent(usedPercent)}`);
-        if (window.limit !== undefined) lines.push(`- Limit: ${window.limit}`);
-        if (window.used !== undefined)
-          lines.push(`- Used amount: ${window.used}`);
-        if (window.remaining !== undefined)
-          lines.push(`- Remaining amount: ${window.remaining}`);
-        if (window.remainingPercent !== undefined)
-          lines.push(`- Remaining: ${formatPercent(window.remainingPercent)}`);
+      const lines = ["# /reset", "", `- Model: ${modelLabel}`, ""];
+      for (const [label, window] of [
+        ["5h", providerUsage.used5h],
+        ["7d", providerUsage.used7d],
+      ] as const) {
+        lines.push(`## ${label}`);
+        lines.push(`- Used: ${formatPercent(window.usedPercent)}`);
         const reset = formatReset(window.resetAt);
-        if (reset) lines.push(`- Resets: ${reset}`);
-        if (lines[lines.length - 1] === `## ${windowId}`)
-          lines.push(
-            `Exact ${windowId} limit data was not exposed by the provider.`,
-          );
+        if (reset) {
+          const relative = formatRelativeDuration(window.resetAt);
+          lines.push(`- Resets: ${reset}${relative ? ` (${relative})` : ""}`);
+        } else if (window.resetAfterSeconds !== undefined) {
+          lines.push(`- Resets: in ${Math.round(window.resetAfterSeconds / 60)}m`);
+        } else {
+          lines.push(`- Resets: unavailable`);
+        }
         lines.push("");
       }
 
-      lines.push(
-        `_Captured: ${new Date(snapshot.capturedAt).toLocaleString()}_`,
-      );
       pi.sendMessage(
         {
           customType: "usage-footer-limit",
