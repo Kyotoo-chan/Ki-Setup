@@ -1,67 +1,50 @@
-<!-- Template: In projektspezifische CLAUDE.md kopieren und mit Projekt-Kontext ergänzen -->
+<!-- Karpathy-inspirierte Referenz. Nicht als Standardvorlage kopieren. -->
 
-# CLAUDE.md
+# Andrej Karpathy inspired CLAUDE.md reference
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+## Zweck
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+Diese Datei ist bewusst **keine** 1:1-Kopiervorlage.
 
-## 1. Think Before Coding
+- Die eigentliche Projektvorlage liegt in [`../templates/CLAUDE.project.md`](../templates/CLAUDE.project.md)
+- Diese Datei sammelt die zugrunde liegenden Arbeitsprinzipien in kompakter Referenzform
+- Projektspezifische Regeln gehören in die Projekt-`CLAUDE.md`, nicht hier hinein
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+## Unterschied zur Template-Datei
 
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+| Datei | Einsatz |
+|---|---|
+| `../templates/CLAUDE.project.md` | Minimale Startvorlage zum Kopieren ins Projekt |
+| `./andrej_karpathy_CLAUDE.md` | Referenz für Arbeitsweise, Review und Selbstkontrolle |
 
-## 2. Simplicity First
+## Core operating principles
 
-**Minimum code that solves the problem. Nothing speculative.**
+### 1. Think Before Coding
+- State assumptions explicitly.
+- Ask when something is unclear.
+- Surface tradeoffs instead of guessing.
+- Prefer the simpler path when it solves the task.
 
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
+### 2. Simplicity First
+- Write the minimum code that solves the problem.
+- Avoid speculative abstractions.
+- Don't add flexibility that was not requested.
+- If the solution feels too large, shrink it.
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+### 3. Surgical Changes
+- Touch only the lines required for the task.
+- Match the surrounding style.
+- Remove only the dead code your change created.
+- Mention unrelated issues instead of fixing them opportunistically.
 
-## 3. Surgical Changes
+### 4. Goal-Driven Execution
+- Define success before editing.
+- Prefer tests or reproducible checks.
+- For multi-step tasks, keep a short plan with a verification step per item.
+- Iterate until the checks pass.
 
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+## Quick self-check
+- Did I ask instead of assume?
+- Is this the simplest solution that works?
+- Can every changed line be justified by the request?
+- Did I verify the result?
