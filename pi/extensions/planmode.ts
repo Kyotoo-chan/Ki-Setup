@@ -1,8 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Box, Editor, Key, Text, type EditorTheme, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import { Box, Key, Text, matchesKey } from "@mariozechner/pi-tui";
 import { Type } from "typebox";
 
 const PLAN_FILE = ".pi/plan.md";
@@ -98,32 +97,6 @@ async function readPlan(cwd: string): Promise<string | undefined> {
 	} catch {
 		return undefined;
 	}
-}
-
-const GLOBAL_KEYBINDINGS_PATH = path.join(os.homedir(), ".pi", "agent", "keybindings.json");
-
-type KeybindingsConfig = Record<string, string | string[]>;
-
-async function readKeybindingsConfig(): Promise<KeybindingsConfig> {
-	try {
-		return JSON.parse(await readFile(GLOBAL_KEYBINDINGS_PATH, "utf8")) as KeybindingsConfig;
-	} catch {
-		return {};
-	}
-}
-
-function normalizeBinding(value: string | string[] | undefined): string[] {
-	if (value === undefined) return [];
-	return Array.isArray(value) ? value : [value];
-}
-
-function hasExactBinding(value: string | string[] | undefined, key: string): boolean {
-	return normalizeBinding(value).map((v) => v.toLowerCase()).includes(key.toLowerCase());
-}
-
-async function writeKeybindingsConfig(config: KeybindingsConfig): Promise<void> {
-	await mkdir(path.dirname(GLOBAL_KEYBINDINGS_PATH), { recursive: true });
-	await writeFile(GLOBAL_KEYBINDINGS_PATH, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
 
 type PlanMessageDetails = {
@@ -244,15 +217,14 @@ class PlanModeEditor extends CustomEditor {
 		tui: ConstructorParameters<typeof CustomEditor>[0],
 		theme: ConstructorParameters<typeof CustomEditor>[1],
 		keybindings: ConstructorParameters<typeof CustomEditor>[2],
-		private isPlanModeActive: () => boolean,
-		private onShowPlan: () => void,
+		private onTogglePlanMode: () => void | Promise<void>,
 	) {
 		super(tui, theme, keybindings);
 	}
 
 	handleInput(data: string): void {
 		if (matchesKey(data, Key.ctrl("p"))) {
-			if (this.isPlanModeActive()) this.onShowPlan();
+			void this.onTogglePlanMode();
 			return;
 		}
 		super.handleInput(data);
@@ -263,12 +235,14 @@ export default function planModeExtension(pi: ExtensionAPI) {
 	let active = false;
 	let taskPrompt = "";
 	let lastShownPlan = "";
-	let keybindingsPromptHandled = false;
 
-	pi.registerMessageRenderer<PlanMessageDetails>("planmode-plan", (message, _options, theme) => {
+	pi.registerMessageRenderer<PlanMessageDetails>("planmode-plan", (message, options, theme) => {
 		if (typeof message.content !== "string") return undefined;
 		const box = new Box(1, 1, (text) => theme.bg("selectedBg", text));
-		box.addChild(new Text(formatPlanForDisplay(message.content, message.details, theme)));
+		const details = options.expanded ? message.details : { ...message.details, hint: undefined };
+		const text = formatPlanForDisplay(message.content, details, theme);
+		const preview = [...text.split("\n").slice(0, 10), "", theme.fg("dim", "Ctrl+O to expand")].join("\n");
+		box.addChild(new Text(options.expanded ? text : preview));
 		return box;
 	});
 
@@ -305,206 +279,75 @@ export default function planModeExtension(pi: ExtensionAPI) {
 				};
 			}
 
-			const result = await ctx.ui.custom<PlanQuestionsResult>((tui, theme, _keybindings, done) => {
-				let questionIndex = 0;
-				let inputMode = false;
-				let cachedLines: string[] | undefined;
-				const selections = questions.map(() => 0);
-				const answers = questions.map<PlanAnswer | undefined>(() => undefined);
+			const title = params.title?.trim() || "Plan mode questions";
+			const answers: PlanAnswer[] = [];
 
-				const editorTheme: EditorTheme = {
-					borderColor: (text) => theme.fg("accent", text),
-					selectList: {
-						selectedPrefix: (text) => theme.fg("accent", text),
-						selectedText: (text) => theme.fg("accent", text),
-						description: (text) => theme.fg("muted", text),
-						scrollInfo: (text) => theme.fg("dim", text),
-						noMatch: (text) => theme.fg("warning", text),
-					},
-				};
-				const editor = new Editor(tui, editorTheme);
+			for (let index = 0; index < questions.length; index++) {
+				const question = questions[index]!;
+				const options = [...question.suggestions, "Eigene Eingabe"];
+				const prompt = [`${title} (${index + 1}/${questions.length})`, question.label, "", question.question].join("\n");
+				const selection = await ctx.ui.select(prompt, options);
 
-				function refresh() {
-					cachedLines = undefined;
-					tui.requestRender();
+				if (selection === undefined) {
+					return {
+						content: [{ type: "text", text: "The user cancelled the structured clarifying questions." }],
+						details: {
+							title: params.title?.trim() || undefined,
+							questions,
+							answers,
+							cancelled: true,
+						} satisfies PlanQuestionsResult,
+					};
 				}
 
-				function optionLabels(index: number): string[] {
-					return [...questions[index]!.suggestions, "Eigene Eingabe"];
-				}
-
-				function allAnswered(): boolean {
-					return answers.every(Boolean);
-				}
-
-				function answeredCount(): number {
-					return answers.filter(Boolean).length;
-				}
-
-				function finish(cancelled: boolean) {
-					done({
-						title: params.title?.trim() || undefined,
-						questions,
-						answers: answers.filter((answer): answer is PlanAnswer => !!answer),
-						cancelled,
-					});
-				}
-
-				function saveAnswer(answer: PlanAnswer) {
-					answers[questionIndex] = answer;
-					if (questionIndex < questions.length - 1) {
-						questionIndex++;
-						refresh();
-						return;
-					}
-					if (allAnswered()) {
-						finish(false);
-						return;
-					}
-					refresh();
-				}
-
-				function openCustomInput() {
-					inputMode = true;
-					editor.setText(answers[questionIndex]?.wasCustom ? answers[questionIndex]!.answer : "");
-					refresh();
-				}
-
-				editor.onSubmit = (value) => {
-					const trimmed = value.trim();
-					if (!trimmed) {
-						ctx.ui.notify("Please enter a value before confirming.", "warning");
-						return;
-					}
-					inputMode = false;
-					saveAnswer({
-						label: questions[questionIndex]!.label,
-						answer: trimmed,
-						wasCustom: true,
-					});
-				};
-
-				return {
-					handleInput(data: string): void {
-						if (inputMode) {
-							if (matchesKey(data, Key.escape)) {
-								inputMode = false;
-								editor.setText("");
-								refresh();
-								return;
-							}
-							editor.handleInput(data);
-							refresh();
-							return;
+				if (selection === "Eigene Eingabe") {
+					let draft = "";
+					for (;;) {
+						const customAnswer = await ctx.ui.editor(prompt, draft);
+						if (customAnswer === undefined) {
+							return {
+								content: [{ type: "text", text: "The user cancelled the structured clarifying questions." }],
+								details: {
+									title: params.title?.trim() || undefined,
+									questions,
+									answers,
+									cancelled: true,
+								} satisfies PlanQuestionsResult,
+							};
 						}
 
-						const options = optionLabels(questionIndex);
+						draft = customAnswer;
+						const trimmed = customAnswer.trim();
+						if (!trimmed) {
+							ctx.ui.notify("Please enter a value before confirming.", "warning");
+							continue;
+						}
 
-						if (matchesKey(data, Key.left)) {
-							if (questionIndex > 0) {
-								questionIndex--;
-								refresh();
-							}
-							return;
-						}
-						if (matchesKey(data, Key.right)) {
-							if (questionIndex < questions.length - 1) {
-								questionIndex++;
-								refresh();
-							}
-							return;
-						}
-						if (matchesKey(data, Key.up)) {
-							selections[questionIndex] = Math.max(0, selections[questionIndex]! - 1);
-							refresh();
-							return;
-						}
-						if (matchesKey(data, Key.down)) {
-							selections[questionIndex] = Math.min(options.length - 1, selections[questionIndex]! + 1);
-							refresh();
-							return;
-						}
-						if (matchesKey(data, Key.enter)) {
-							const selection = selections[questionIndex]!;
-							if (selection === options.length - 1) {
-								openCustomInput();
-								return;
-							}
-							saveAnswer({
-								label: questions[questionIndex]!.label,
-								answer: options[selection]!,
-								choiceIndex: selection + 1,
-								wasCustom: false,
-							});
-							return;
-						}
-						if (matchesKey(data, Key.escape)) {
-							finish(true);
-						}
-					},
-					invalidate(): void {
-						cachedLines = undefined;
-					},
-					render(width: number): string[] {
-						if (cachedLines) return cachedLines;
-
-						const lines: string[] = [];
-						const add = (text: string) => lines.push(truncateToWidth(text, width));
-						const currentQuestion = questions[questionIndex]!;
-						const options = optionLabels(questionIndex);
-						const currentAnswer = answers[questionIndex];
-
-						add(theme.fg("accent", "─".repeat(width)));
-						add(theme.fg("accent", theme.bold(params.title?.trim() || "Plan mode questions")));
-						add(theme.fg("muted", `${answeredCount()}/${questions.length} answered`));
-						lines.push("");
-
-						const tabs = questions.map((question, index) => {
-							const answered = answers[index] ? theme.fg("success", "✓") : theme.fg("muted", "○");
-							const label = `${answered} ${question.label}`;
-							return index === questionIndex ? theme.bg("selectedBg", ` ${label} `) : ` ${label} `;
+						answers.push({
+							label: question.label,
+							answer: trimmed,
+							wasCustom: true,
 						});
-						add(tabs.join(" "));
-						lines.push("");
+						break;
+					}
+					continue;
+				}
 
-						add(theme.fg("text", currentQuestion.question));
-						lines.push("");
-
-						if (!inputMode) {
-							for (let i = 0; i < options.length; i++) {
-								const selected = i === selections[questionIndex];
-								const prefix = selected ? theme.fg("accent", "> ") : "  ";
-								const label = selected ? theme.fg("accent", options[i]!) : options[i]!;
-								add(`${prefix}${label}`);
-							}
-							if (currentAnswer) {
-								lines.push("");
-								add(`${theme.fg("muted", "Current answer:")} ${currentAnswer.answer}`);
-							}
-							lines.push("");
-							add(theme.fg("dim", "←→ question • ↑↓ option • Enter confirm • Esc cancel"));
-						} else {
-							for (const line of editor.render(width)) {
-								add(line);
-							}
-							lines.push("");
-							add(theme.fg("dim", "Enter save • Esc back"));
-						}
-
-						add(theme.fg("accent", "─".repeat(width)));
-						cachedLines = lines;
-						return lines;
-					},
-				};
-			});
-
-			if (result.cancelled) {
-				return {
-					content: [{ type: "text", text: "The user cancelled the structured clarifying questions." }],
-					details: result,
-				};
+				const choiceIndex = question.suggestions.findIndex((suggestion) => suggestion === selection);
+				answers.push({
+					label: question.label,
+					answer: selection,
+					choiceIndex: choiceIndex >= 0 ? choiceIndex + 1 : undefined,
+					wasCustom: false,
+				});
 			}
 
+			const result: PlanQuestionsResult = {
+				title: params.title?.trim() || undefined,
+				questions,
+				answers,
+				cancelled: false,
+			};
 			const summary = result.answers.map((answer) => `- ${answer.label}: ${answer.answer}`).join("\n");
 			return {
 				content: [{ type: "text", text: `Structured user answers:\n${summary}` }],
@@ -540,7 +383,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 
 	function footerText(ctx: ExtensionContext): string | undefined {
 		if (!active) return undefined;
-		return `${ctx.ui.theme.fg("accent", "plan mode on")} ${ctx.ui.theme.fg("muted", "(shift+tab toggle, ctrl+p view)")}`;
+		return `${ctx.ui.theme.fg("accent", "plan mode on")} ${ctx.ui.theme.fg("muted", "(ctrl+p or /plan toggle)")}`;
 	}
 
 	function updateUi(ctx: ExtensionContext) {
@@ -562,6 +405,14 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		if (notify) ctx.ui.notify(notify, "info");
 	}
 
+	async function togglePlanning(ctx: ExtensionContext) {
+		if (active) {
+			resetPlanning(ctx, "Plan mode disabled");
+			return;
+		}
+		await enablePlanning(ctx, "", false);
+	}
+
 	async function enablePlanning(ctx: ExtensionContext, prompt = "", queuePrompt = false) {
 		active = true;
 		taskPrompt = prompt.trim();
@@ -579,13 +430,30 @@ export default function planModeExtension(pi: ExtensionAPI) {
 			`Plan this task before implementation: ${taskPrompt}`,
 			`Work in planning mode only. Inspect the codebase read-only and identify missing information first.`,
 			`If anything is ambiguous, risky, or underspecified, ask clarifying questions with ${PLAN_QUESTIONS_TOOL} first. Provide short labels and concrete suggestions. Do not add your own "other" option because the tool already appends a free-text choice.`,
-			`Do not write ${PLAN_FILE} before those questions are answered or there are genuinely no open questions.`,
+			`Do not write ${PLAN_FILE} before those questions are answered or there are genuinely no open questions. Do not put unanswered open questions into the written plan.`,
 			`Only when there are no open questions, write the plan to ${PLAN_FILE}. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.`,
 			`Do not edit any file except ${PLAN_FILE}. After asking questions or after writing the plan, stop and wait for the user's next message.`,
 		].join("\n\n");
 
 		if (ctx.isIdle()) pi.sendUserMessage(planRequest);
 		else pi.sendUserMessage(planRequest, { deliverAs: "steer" });
+	}
+
+	function sendPlanRefinementContext(ctx: ExtensionContext) {
+		const content = [
+			"[PLAN MODE FOLLOW-UP]",
+			"The user's next message is a refinement to the active plan, not plan approval and not an implementation request.",
+			`Treat it as a request to update ${PLAN_FILE}. If the refinement is specific enough, overwrite ${PLAN_FILE} completely in this turn and then stop.`,
+			`Only if genuinely required information is still missing, ask clarifying questions with ${PLAN_QUESTIONS_TOOL} first and stop without implementing anything.`,
+			`Do not edit any file except ${PLAN_FILE}.`,
+		].join("\n\n");
+
+		if (ctx.isIdle()) {
+			pi.sendMessage({ customType: "planmode-refinement-context", content, display: false }, { triggerTurn: false });
+			return;
+		}
+
+		pi.sendMessage({ customType: "planmode-refinement-context", content, display: false }, { triggerTurn: false, deliverAs: "steer" });
 	}
 
 	function extractOpenQuestions(plan: string): string[] {
@@ -664,22 +532,17 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		);
 	}
 
-	async function showPlan(ctx: ExtensionContext) {
-		const plan = await readPlan(ctx.cwd);
-		if (!plan?.trim()) {
-			ctx.ui.notify(`No ${PLAN_FILE} found yet`, "warning");
-			return;
-		}
-
-		lastShownPlan = plan.trim();
+	function showPlan(plan: string, hint: string) {
+		const trimmedPlan = plan.trim();
+		lastShownPlan = trimmedPlan;
 		persist();
 		pi.sendMessage(
 			{
 				customType: "planmode-plan",
-				content: plan.trim(),
+				content: trimmedPlan,
 				details: {
 					path: PLAN_FILE,
-					hint: 'Reply with approval like "approve plan" or send a normal follow-up message to refine/change the plan.',
+					hint,
 					task: taskPrompt || undefined,
 				},
 				display: true,
@@ -692,15 +555,14 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		if (!active) return;
 		const plan = (await readPlan(ctx.cwd))?.trim();
 		if (!plan || plan === lastShownPlan) return;
-		lastShownPlan = plan;
-		persist();
 
-		if (extractOpenQuestions(plan).length > 0) {
-			ctx.ui.notify("Plan updated. It still contains open questions. Use the structured question flow, then press Ctrl+P to review the full plan.", "info");
-			return;
-		}
-
-		ctx.ui.notify("Plan updated. Press Ctrl+P to view it.", "info");
+		const hasOpenQuestions = extractOpenQuestions(plan).length > 0;
+		showPlan(
+			plan,
+			hasOpenQuestions
+				? 'This plan still contains open questions. Refine the request or answer clarifying questions, then review this entry with Ctrl+O.'
+				: 'Reply with approval like "approve plan" or send a normal follow-up message to refine/change the plan. Use Ctrl+O to expand this entry.',
+		);
 	}
 
 	async function approvePlan(ctx: ExtensionContext, note?: string) {
@@ -718,49 +580,8 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		return true;
 	}
 
-	async function maybeOfferKeybindingSetup(ctx: ExtensionContext) {
-		if (keybindingsPromptHandled || !ctx.hasUI) return;
-		keybindingsPromptHandled = true;
-
-		const config = await readKeybindingsConfig();
-		const thinkingCycle = config["app.thinking.cycle"];
-		const thinkingToggle = config["app.thinking.toggle"];
-		const hasCycleOverride = Object.prototype.hasOwnProperty.call(config, "app.thinking.cycle");
-		const shiftTabFreed = hasCycleOverride && !hasExactBinding(thinkingCycle, "shift+tab");
-		const needsFreeShiftTab = !shiftTabFreed;
-		const needsCtrlT = !hasExactBinding(thinkingCycle, "ctrl+t");
-		const needsCtrlAltT = !hasExactBinding(thinkingToggle, "ctrl+alt+t");
-		if (!needsFreeShiftTab && !needsCtrlT && !needsCtrlAltT) return;
-
-		const changes = [
-			`${needsFreeShiftTab ? "remove" : "keep removed"} shift+tab from app.thinking.cycle so the exported plan mode shortcut can use Shift+Tab`,
-			`${needsCtrlT ? "add" : "keep"} ctrl+t -> app.thinking.cycle`,
-			`${needsCtrlAltT ? "set" : "keep"} ctrl+alt+t -> app.thinking.toggle (moves the old ctrl+t toggle)`,
-		];
-
-		const choice = await ctx.ui.select(
-			`Exported setup detected missing keybindings. Apply global keybinding changes in ${GLOBAL_KEYBINDINGS_PATH}?\n\n${changes.join("\n")}`,
-			["Apply changes", "Not now"],
-		);
-		if (choice !== "Apply changes") return;
-
-		const nextConfig: KeybindingsConfig = { ...config };
-		const nextThinkingCycle = Array.from(
-			new Set([
-				...normalizeBinding(thinkingCycle).filter((v) => v.toLowerCase() !== "shift+tab"),
-				"ctrl+shift+t",
-				"ctrl+t",
-			]),
-		);
-		const nextThinkingToggle = Array.from(new Set(["ctrl+alt+t", ...normalizeBinding(thinkingToggle).filter((v) => v.toLowerCase() !== "ctrl+t")]));
-		nextConfig["app.thinking.cycle"] = nextThinkingCycle;
-		nextConfig["app.thinking.toggle"] = nextThinkingToggle.length === 1 ? nextThinkingToggle[0] : nextThinkingToggle;
-		await writeKeybindingsConfig(nextConfig);
-		ctx.ui.notify("Global keybindings updated for exported setup. Run /reload if needed.", "success");
-	}
-
 	pi.registerCommand("plan", {
-		description: "Enable plan mode or view the current session plan",
+		description: "Toggle plan mode or plan a specific task",
 		handler: async (args, ctx) => {
 			const input = args.trim();
 			const lower = input.toLowerCase();
@@ -770,37 +591,22 @@ export default function planModeExtension(pi: ExtensionAPI) {
 				return;
 			}
 
+			if (["show", "view", "inspect", "full"].includes(lower)) {
+				ctx.ui.notify("Plans now appear as normal messages in the timeline. Use Ctrl+O on the plan entry to expand it.", "info");
+				return;
+			}
+
 			if (input) {
 				await enablePlanning(ctx, input, true);
 				return;
 			}
 
-			if (!active) {
-				await enablePlanning(ctx, "", false);
-				return;
-			}
-
-			await showPlan(ctx);
-		},
-	});
-
-	pi.registerShortcut(Key.shift("tab"), {
-		description: "Toggle plan mode",
-		handler: async (ctx) => {
-			if (active) {
-				resetPlanning(ctx, "Plan mode disabled");
-				return;
-			}
-			await enablePlanning(ctx, "", false);
+			await togglePlanning(ctx);
 		},
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
-		ctx.ui.setEditorComponent((tui, theme, keybindings) =>
-			new PlanModeEditor(tui, theme, keybindings, () => active, () => {
-				void showPlan(ctx);
-			}),
-		);
+		ctx.ui.setEditorComponent((tui, theme, keybindings) => new PlanModeEditor(tui, theme, keybindings, () => togglePlanning(ctx)));
 		const entries = ctx.sessionManager.getEntries();
 		const state = entries
 			.filter((e: { type: string; customType?: string }) => e.type === "custom" && e.customType === "planmode-state")
@@ -811,7 +617,6 @@ export default function planModeExtension(pi: ExtensionAPI) {
 			lastShownPlan = state.data.lastShownPlan ?? lastShownPlan;
 		}
 		updateUi(ctx);
-		await maybeOfferKeybindingSetup(ctx);
 	});
 
 	pi.on("before_agent_start", async (_event, ctx) => {
@@ -821,7 +626,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 			message: {
 				customType: "planmode-context",
 				content:
-					`[PLAN MODE ACTIVE]\nCurrent task: ${taskPrompt || "(will be provided by the user's next message)"}\n\nBefore making any code or file changes, do the following in order:\n1. Analyze the task and inspect the codebase read-only.\n2. Identify missing information first. If anything is ambiguous, risky, or underspecified, ask clarifying questions with ${PLAN_QUESTIONS_TOOL}.\n3. When using ${PLAN_QUESTIONS_TOOL}, provide short labels and concrete suggestions. Do not add your own "other" option because the tool already appends a free-text choice.\n4. Do not write ${PLAN_FILE} until those questions have been answered or there are genuinely no open questions.\n5. Once there are no open questions, write a detailed implementation plan to ${PLAN_FILE} using the write tool. Overwrite that file completely when updating the plan.\n6. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.\n7. Do not edit any file except ${PLAN_FILE}. Do not use write/edit/bash to modify anything else.\n8. After asking questions or after writing the plan, stop and wait for the user's next message.\n9. If the user refines the request, update the plan instead of implementing.\n10. Only start implementation after the user clearly approves the plan.\n\nCurrent working directory: ${ctx.cwd}\nPlan file absolute path: ${planAbs}`,
+					`[PLAN MODE ACTIVE]\nCurrent task: ${taskPrompt || "(will be provided by the user's next message)"}\n\nBefore making any code or file changes, do the following in order:\n1. Analyze the task and inspect the codebase read-only.\n2. Identify missing information first. If anything is ambiguous, risky, or underspecified, ask clarifying questions with ${PLAN_QUESTIONS_TOOL}.\n3. When using ${PLAN_QUESTIONS_TOOL}, provide short labels and concrete suggestions. Do not add your own "other" option because the tool already appends a free-text choice.\n4. Do not write ${PLAN_FILE} until those questions have been answered or there are genuinely no open questions. Do not put unanswered open questions into the written plan.\n5. Once there are no open questions, write a detailed implementation plan to ${PLAN_FILE} using the write tool. Overwrite that file completely when updating the plan.\n6. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.\n7. Do not edit any file except ${PLAN_FILE}. Do not use write/edit/bash to modify anything else.\n8. After asking questions or after writing the plan, stop and wait for the user's next message.\n9. If the user refines the request, treat it as a plan refinement request and overwrite ${PLAN_FILE} again before stopping instead of just discussing changes.\n10. Only start implementation after the user clearly approves the plan.\n\nCurrent working directory: ${ctx.cwd}\nPlan file absolute path: ${planAbs}`,
 				display: false,
 			},
 		};
@@ -866,10 +671,18 @@ export default function planModeExtension(pi: ExtensionAPI) {
 			return { action: "handled" };
 		}
 
-		if (!taskPrompt && event.text.trim()) {
-			taskPrompt = event.text.trim();
+		const refinement = event.text.trim();
+		if (!refinement) return;
+
+		if (!taskPrompt) {
+			taskPrompt = refinement;
 			persist();
 		}
+
+		sendPlanRefinementContext(ctx);
+		if (ctx.isIdle()) pi.sendUserMessage(refinement);
+		else pi.sendUserMessage(refinement, { deliverAs: "steer" });
+		return { action: "handled" };
 	});
 
 	pi.on("agent_end", async (_event, ctx) => {

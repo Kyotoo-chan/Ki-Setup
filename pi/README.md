@@ -56,8 +56,9 @@ pi/
 
 Zusätzliche Shortcuts im Setup:
 
-- `Shift+Tab` schaltet den Plan Mode um
-- `Ctrl+P` zeigt im aktiven Plan Mode die aktuelle `.pi/plan.md`
+- `Shift+Tab` cycled den Thinking Mode
+- `Ctrl+P` schaltet den Plan Mode um
+- Plan-Nachrichten erscheinen im Verlauf und lassen sich wie andere Einträge mit `Ctrl+O` expandieren
 - `Ctrl+L` öffnet die Modell-Auswahl
 
 ---
