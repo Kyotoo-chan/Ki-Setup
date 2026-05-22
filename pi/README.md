@@ -1,101 +1,70 @@
-# Agentic Coding Setup
+# Pi Setup
 
-Dieses Setup ist für **Windows 11** gedacht und benötigt eine [Node.js](https://nodejs.org/dist/v24.15.0/node-v24.15.0-x64.msi)-Installation.
+> Dieser Ordner ist nur für Pi.
+> Wenn eine Umsetzung unklar ist, erst `/plan` nutzen und den Weg klären.
+> Ab **75 %** Kontextauslastung wird automatisch kompaktiert.
 
-> Das allgemeine Regelwerk liegt in [`AGENTS.md`](./AGENTS.md). Die Agent-Profile werden mit Claude geteilt und liegen unter [`../agents/`](../agents/). Claude-spezifische Dateien liegen getrennt unter [`../claude/`](../claude/).
+Dieses Setup ist für **Windows 11** gedacht und braucht eine [Node.js](https://nodejs.org/dist/v24.15.0/node-v24.15.0-x64.msi)-Installation.
 
----
-
-## Schnellstart
+## Installation
 
 ```bash
 npm install -g @mariozechner/pi-coding-agent
-```
-```bash
 pi
-```
-```bash
 /login
 ```
 
-Passenden Provider auswählen und dann **nicht** den Link per `strg+klick` **öffnen**.  
+Passenden Provider auswählen und dann **nicht** den Link per `strg+klick` **öffnen**.
 Stattdessen den Link kopieren und im Browser **händisch alle Leerzeichen entfernen**.
 
----
+## `AGENTS.md` in diesem Ordner
 
-## Repo-Struktur
-
-```text
-pi/
-├── extensions/          ← Erweiterungen für Pi
-├── AGENTS.md            ← Regelwerk für den allgemeinen Bereich
-└── README.md
-```
-
----
+[`AGENTS.md`](./AGENTS.md) beschreibt die Regeln für den allgemeinen Pi-Bereich.
+Wenn du die Datei in ein Projekt übernimmst, passe sie an das Projekt an.
+Die geteilten Rollenprofile liegen zusätzlich in [`../agents/main.md`](../agents/main.md).
 
 ## Kerndateien
 
 | Datei | Zweck |
 |---|---|
-| [`AGENTS.md`](./AGENTS.md) | Regelwerk für das allgemeine Setup |
-| [`../agents/main.md`](../agents/main.md) | Übersicht der geteilten Agent-Profile |
+| [`AGENTS.md`](./AGENTS.md) | Regeln für das allgemeine Pi-Setup |
 | [`extensions/planmode.ts`](./extensions/planmode.ts) | Plan Mode mit strukturierten Rückfragen |
-| [`extensions/usage-footer.ts`](./extensions/usage-footer.ts) | Footer, Auto-Compaction und `/reset` |
+| [`extensions/usage-footer.ts`](./extensions/usage-footer.ts) | Footer, Auto-Compact und `/reset` |
+| [`extensions/model-selector.ts`](./extensions/model-selector.ts) | Modellwahl und Denktiefe |
 
----
+## Eigene Pi-Befehle
 
-## Eigene Pi Befehle
+Ein Teil dieser Befehle wurde bewusst ergänzt, weil der Workflow aus Claude im Alltag praktisch ist.
 
 | Befehl | Funktion | Quelle |
 |---|---|---|
-| `/btw` | Schneller Hinweis/Kontext-Einwurf | [`extensions/btw.ts`](./extensions/btw.ts) |
+| `/btw` | Schneller Zusatzhinweis oder Kontext-Einwurf | [`extensions/btw.ts`](./extensions/btw.ts) |
 | `/plan` | Erst planen, dann implementieren | [`extensions/planmode.ts`](./extensions/planmode.ts) |
-| `/reset` | Zeigt verfügbare Reset-Zeiten des aktuellen Providers | [`extensions/usage-footer.ts`](./extensions/usage-footer.ts) |
-| `/model` | Modellwechsel mit Auswahl der Denktiefe | basiert auf [`extensions/model-selector.ts`](./extensions/model-selector.ts) |
+| `/reset` | Zeigt Reset-Zeiten des aktuellen Providers | [`extensions/usage-footer.ts`](./extensions/usage-footer.ts) |
+| `/model` | Modellwechsel mit Auswahl der Denktiefe | [`extensions/model-selector.ts`](./extensions/model-selector.ts) |
 
-Zusätzliche Shortcuts im Setup:
+Zusätzliche Shortcuts:
 
-- `Shift+Tab` cycled den Thinking Mode
+- `Shift+Tab` wechselt den Thinking Mode
 - `Ctrl+P` schaltet den Plan Mode um
-- Plan-Nachrichten erscheinen im Verlauf und lassen sich wie andere Einträge mit `Ctrl+O` expandieren
+- `Ctrl+O` klappt Plan-Nachrichten im Verlauf auf
 - `Ctrl+L` öffnet die Modell-Auswahl
 
----
+## Auto-Compact
 
-## Settings
-
-Die Extension [`extensions/usage-footer.ts`](./extensions/usage-footer.ts) kompaktet proaktiv ab **75 %** Kontextauslastung.
-
----
+[`extensions/usage-footer.ts`](./extensions/usage-footer.ts) kompaktiert ab **75 %** Kontextauslastung automatisch.
 
 ## Eigene Extensions nutzen
 
-Die Dateien unter [`extensions/`](./extensions/) können nach:
+Die Dateien unter [`extensions/`](./extensions/) kannst du nach:
 
 - `~/.pi/agent/extensions/`
 - `.pi/extensions/`
 
-kopiert und danach mit `/reload` neu geladen werden.
+kopieren und danach mit `/reload` neu laden.
 
----
+## Modell- und Denktiefen-Strategie
 
-### Modell- & Denktiefen-Strategie
-
-- Als **Standard-Denktiefe** wird `medium` bis manchmal `high` verwendet
-- Als **Standard-Modell** wird **Anthropic-Sonnet-(aktuellste Version)** oder **OpenAI GPT-(Vorgängerversion der neuesten Version)** für normales Coding genutzt
-- **Anthropic-Opus-(aktuellste Version)** oder **OpenAI GPT-(aktuellste Version)** nur bei sehr komplexen Aufgaben wie Architektur-Entscheidungen, schwierigen Bugfixes und großen Code-Reviews
-
----
-
-## Hinweis zu den geteilten Agent-Profilen
-
-Die eigentlichen Rollenprofile liegen gemeinsam unter [`../agents/`](../agents/).
-Sie können sowohl für Pi als auch für Claude sinnvoll sein.
-
----
-
-## Hinweis zum Ordner `../claude/`
-
-[`../claude/`](../claude/) enthält ein **eigenständiges Setup** speziell für Claude.
-Es ist vom allgemeinen Pi-Teil getrennt und nur dann relevant, wenn man den Claude-Teil separat nutzen möchte.
+- Standard-Denktiefe: meist `medium`, manchmal `high`
+- Standard-Modell für normales Coding: aktuelles Sonnet oder ein gutes GPT-Modell der Vorgängergeneration
+- Für sehr komplexe Aufgaben: aktuelles Opus oder aktuelles GPT
