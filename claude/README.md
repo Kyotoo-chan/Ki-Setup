@@ -1,7 +1,8 @@
 # Claude-only Setup
 
 > Dieser Ordner ist nur für Claude.
-> Wenn eine Umsetzung unklar ist, erst planen und dann umsetzen.
+> Dieses Setup ist für **Windows 11** gedacht.
+> Wenn eine Umsetzung unklar ist, erst mit `/plan` planen und dann umsetzen.
 > Auto-Compact läuft ab **75 %**.
 
 ## Installation
