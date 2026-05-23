@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Box, Key, Text, matchesKey } from "@mariozechner/pi-tui";
@@ -96,6 +96,14 @@ async function readPlan(cwd: string): Promise<string | undefined> {
 		return await readFile(planFileAbsolute(cwd), "utf8");
 	} catch {
 		return undefined;
+	}
+}
+
+async function deletePlan(cwd: string): Promise<void> {
+	try {
+		await rm(planFileAbsolute(cwd), { force: true });
+	} catch {
+		// Ignore cleanup failures.
 	}
 }
 
@@ -235,6 +243,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 	let active = false;
 	let taskPrompt = "";
 	let lastShownPlan = "";
+	let cleanupPending = false;
 
 	pi.registerMessageRenderer<PlanMessageDetails>("planmode-plan", (message, options, theme) => {
 		if (typeof message.content !== "string") return undefined;
@@ -378,7 +387,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 	});
 
 	function persist() {
-		pi.appendEntry("planmode-state", { active, taskPrompt, lastShownPlan });
+		pi.appendEntry("planmode-state", { active, taskPrompt, lastShownPlan, cleanupPending });
 	}
 
 	function footerText(ctx: ExtensionContext): string | undefined {
@@ -417,6 +426,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		active = true;
 		taskPrompt = prompt.trim();
 		lastShownPlan = "";
+		cleanupPending = false;
 		await mkdir(path.dirname(planFileAbsolute(ctx.cwd)), { recursive: true });
 		updateUi(ctx);
 		persist();
@@ -573,8 +583,10 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		}
 
 		resetPlanning(ctx, "Plan approved. Starting implementation.");
+		cleanupPending = true;
+		persist();
 		const extra = note?.trim() ? `\nAdditional note from user: ${note.trim()}` : "";
-		const message = `The implementation plan in ${PLAN_FILE} is approved. Execute it now. Follow the plan, update the plan file if needed, and call out any deviations explicitly.${extra}`;
+		const message = `The implementation plan in ${PLAN_FILE} is approved. Execute it now. Follow the plan, update the plan file if needed, and call out any deviations explicitly. The plan file will be deleted automatically after this implementation run ends.${extra}`;
 		if (ctx.isIdle()) pi.sendUserMessage(message);
 		else pi.sendUserMessage(message, { deliverAs: "steer" });
 		return true;
@@ -610,11 +622,12 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		const entries = ctx.sessionManager.getEntries();
 		const state = entries
 			.filter((e: { type: string; customType?: string }) => e.type === "custom" && e.customType === "planmode-state")
-			.pop() as { data?: { active?: boolean; taskPrompt?: string; lastShownPlan?: string } } | undefined;
+			.pop() as { data?: { active?: boolean; taskPrompt?: string; lastShownPlan?: string; cleanupPending?: boolean } } | undefined;
 		if (state?.data) {
 			active = state.data.active ?? active;
 			taskPrompt = state.data.taskPrompt ?? taskPrompt;
 			lastShownPlan = state.data.lastShownPlan ?? lastShownPlan;
+			cleanupPending = state.data.cleanupPending ?? cleanupPending;
 		}
 		updateUi(ctx);
 	});
@@ -686,6 +699,12 @@ export default function planModeExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("agent_end", async (_event, ctx) => {
+		if (cleanupPending) {
+			await deletePlan(ctx.cwd);
+			cleanupPending = false;
+			persist();
+		}
+
 		await maybeShowPlan(ctx);
 	});
 }

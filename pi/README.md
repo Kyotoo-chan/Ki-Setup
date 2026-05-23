@@ -39,7 +39,7 @@ Ein Teil dieser Befehle wurde bewusst ergänzt, weil der Workflow aus Claude im 
 | Befehl | Funktion | Quelle |
 |---|---|---|
 | `/btw` | Schneller Zusatzhinweis oder Kontext-Einwurf | [`extensions/btw.ts`](./extensions/btw.ts) |
-| `/plan` | Erst planen, dann implementieren | [`extensions/planmode.ts`](./extensions/planmode.ts) |
+| `/plan` | Erst planen, dann implementieren; `.pi/plan.md` wird nach Freigabe und dem nächsten Implementierungs-Lauf automatisch gelöscht | [`extensions/planmode.ts`](./extensions/planmode.ts) |
 | `/reset` | Zeigt Reset-Zeiten des aktuellen Providers | [`extensions/usage-footer.ts`](./extensions/usage-footer.ts) |
 | `/model` | Modellwechsel mit Auswahl der Denktiefe | [`extensions/model-selector.ts`](./extensions/model-selector.ts) |
 
