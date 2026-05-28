@@ -48,7 +48,6 @@ Zusätzliche Shortcuts:
 - `Shift+Tab` wechselt den Thinking Mode
 - `Ctrl+P` schaltet den Plan Mode um
 - `Ctrl+O` klappt Plan-Nachrichten im Verlauf auf
-- `Ctrl+L` öffnet die Modell-Auswahl
 
 ## Auto-Compact
 
