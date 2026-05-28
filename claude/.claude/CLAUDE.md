@@ -13,13 +13,11 @@
 |---|---|
 | `.claude/CLAUDE.md` | Einstieg und Paketkonventionen |
 | `.claude/settings.json` | autocompact 75%, BASH_MAX_OUTPUT_LENGTH 150000 |
-| `.claude/agents.md` | Empfohlene Workflows und Rollentrennung |
-| `.claude/hooks.md` | Hook-Referenz und Windows-Besonderheiten |
 | `.claude/andrej_karpathy_CLAUDE.md` | Karpathy-inspirierte Referenz, nicht als Projektvorlage gedacht |
 | `../templates/CLAUDE.project.md` | Schlanke Startvorlage zum Kopieren in Projektroots |
 
 ## Konventionen
 
 - `settings.json` immer mit `jq . <file>` validieren vor Commit
-- Hooks testen: JSON auf stdin pipen, Exit-Code + Seiteneffekt prüfen
 - Projektvorlagen bleiben in `../templates/`, Referenzen in `.claude/`
+- Persönliche Hooks, Agent-Workflows und Stilregeln gehören nicht in dieses Paket

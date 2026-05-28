@@ -22,8 +22,15 @@ curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del in
 1. Claude Code installieren
 2. Dateien aus [`.claude/`](./.claude/) in dein Claude-Setup übernehmen
 3. [`templates/CLAUDE.project.md`](./templates/CLAUDE.project.md) als `CLAUDE.md` ins Projektroot kopieren
-4. [`./.claude/agents.md`](./.claude/agents.md) an dein Projekt, deine Agenten und deine Workflows anpassen
-5. [`./.claude/andrej_karpathy_CLAUDE.md`](./.claude/andrej_karpathy_CLAUDE.md) nur als Referenz nutzen
+4. [`./.claude/andrej_karpathy_CLAUDE.md`](./.claude/andrej_karpathy_CLAUDE.md) nur als Referenz nutzen
+
+## Bewusst nicht im Repo
+
+- Agent-Workflows und Rollenaufteilungen
+- Hooks
+- projektspezifische Stilregeln
+
+Diese Dinge sind meist persönlich oder projektabhängig und sollten lokal oder direkt im Zielprojekt gepflegt werden.
 
 ## Wichtige Claude-Befehle
 
@@ -39,10 +46,7 @@ claude/
 ├── README.md
 ├── .claude/
 │   ├── CLAUDE.md
-│   ├── agents.md
 │   ├── andrej_karpathy_CLAUDE.md
-│   ├── hooks.md
-│   ├── rules/
 │   └── settings.json
 └── templates/
     └── CLAUDE.project.md
@@ -53,17 +57,9 @@ claude/
 | Datei | Zweck |
 |---|---|
 | [`./.claude/CLAUDE.md`](./.claude/CLAUDE.md) | Einstieg und Paketkonventionen |
-| [`./.claude/agents.md`](./.claude/agents.md) | Workflow-Hinweise und Rollentrennung |
-| [`./.claude/hooks.md`](./.claude/hooks.md) | Hook-Referenz und Windows-Hinweise |
 | [`./.claude/settings.json`](./.claude/settings.json) | Auto-Compact ab 75 % und weitere Settings |
 | [`./.claude/andrej_karpathy_CLAUDE.md`](./.claude/andrej_karpathy_CLAUDE.md) | Referenz, nicht die Kopiervorlage |
 | [`./templates/CLAUDE.project.md`](./templates/CLAUDE.project.md) | Schlanke Startvorlage für projektspezifische Claude-Regeln |
-
-## `agents.md` in diesem Ordner
-
-[`./.claude/agents.md`](./.claude/agents.md) beschreibt, wie Aufgaben und Rollen hier grob getrennt werden.
-Wenn du die Datei in ein Projekt übernimmst, passe sie an deine echten Agenten, Namen und Abläufe an.
-Das geht per Agent oder von Hand.
 
 ## Auto-Compact
 
