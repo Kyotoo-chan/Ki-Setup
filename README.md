@@ -1,8 +1,8 @@
 # Agentic Coding Setup
 
-> Dieses Repo ist eine einfache Basis für Pi und Claude unter **Windows 11**.
-> Wenn eine Umsetzung nicht klar ist, erst im Plan Mode oder mit `/plan` klären und dann umsetzen.
-> `AGENTS.md` und `agents.md` sind nur Startpunkte. Kopiere sie pro Projekt und passe sie an, per Agent oder von Hand.
+> Dieses Repo soll als einfacher Einstieg für Coding Agenten wie Pi und Claude Code unter vorallem **Windows 11** diehnen.
+> Bevor die Umsetzung stattfindet, ist es ratsam, erst im Plan Mode oder mit `/plan` mit dem Agenten das Problem genauer zu spezifizieren und dann umsetzen.
+> `AGENTS.md` und `agents.md` sind nur Startpunkte. Kopiere sie pro Projekt und passe sie, per Agent oder von Hand an spezifische Anforderungen und Projekte, an.
 
 ## Schnellstart
 
