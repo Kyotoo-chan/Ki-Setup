@@ -2,7 +2,7 @@
 
 > Dieses Repo bündelt ein schlankes Setup für Coding-Agenten wie Pi und Claude Code. Der Fokus liegt auf **Windows 11**.
 > Vor der Umsetzung lohnt sich ein kurzer Plan Mode oder `/plan`: So werden Ziel, Randbedingungen und offene Fragen geklärt, bevor Dateien geändert werden.
-> Für Pi nutzt das Setup externe Packages für Tool-Darstellung, Kontextarbeit, Web-Zugriff, Rückfragen und Todo-Listen. Die Install-Befehle stehen in [`pi/README.md`](./pi/README.md).
+> Für Pi nutzt das Setup externe Packages für Tool-Darstellung, Kontextarbeit, Rückfragen und Todo-Listen. Die Install-Befehle stehen in [`pi/README.md`](./pi/README.md).
 > `AGENTS.md` und `agents.md` sind Vorlagen. Kopiere sie pro Projekt und passe Regeln, Rollen und Kontext an das jeweilige Projekt an.
 
 ## Schnellstart
@@ -22,7 +22,6 @@ Danach je nach Bereich weiter in:
 ```bash
 pi install npm:pi-claude-style-tools
 pi install npm:context-mode
-pi install npm:pi-web-access
 pi install npm:@juicesharp/rpiv-ask-user-question
 pi install npm:@juicesharp/rpiv-todo
 ```

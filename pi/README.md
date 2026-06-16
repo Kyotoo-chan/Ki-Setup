@@ -22,7 +22,6 @@ Danach die in diesem Setup verwendeten Packages installieren:
 ```bash
 pi install npm:pi-claude-style-tools
 pi install npm:context-mode
-pi install npm:pi-web-access
 pi install npm:@juicesharp/rpiv-ask-user-question
 pi install npm:@juicesharp/rpiv-todo
 ```
@@ -51,7 +50,6 @@ Die geteilten Rollenprofile liegen zusätzlich in [`../agents/main.md`](../agent
 |---|---|
 | `pi-claude-style-tools` | Claude-Code-artige Tool-Darstellung und Vorschauen in Pi |
 | `context-mode` | Zusätzliche `ctx_*`-Tools für Kontextschonung, Analyse, Suche und Dokumenten-/Output-Verarbeitung |
-| `pi-web-access` | Websuche, URL-Fetching sowie zusätzliche Web-/Repo-/PDF-Helfer |
 | `@juicesharp/rpiv-ask-user-question` | Strukturiertes Rückfrage-Tool `ask_user_question` mit auswählbaren Optionen |
 | `@juicesharp/rpiv-todo` | `todo`-Tool plus `/todos`; kann vom Modell selbst für Mehrschritt-Aufgaben genutzt werden |
 
