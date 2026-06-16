@@ -12,4 +12,4 @@ Dieses Verzeichnis enthält das allgemeine Pi-Setup dieses Repos.
 ## Agent-Profile
 
 Die Übersicht liegt in [`../agents/main.md`](../agents/main.md).
-Die Profile werden bewusst mit dem Claude-Bereich geteilt.
+Die Profile werden im Pi- und Claude-Bereich gemeinsam verwendet, damit Rollen und Arbeitsweise konsistent bleiben.

@@ -1,8 +1,8 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import type { Model } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Key, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import type { Model } from "@earendil-works/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
 type ThinkingLevel = (typeof THINKING_LEVELS)[number];
@@ -48,6 +48,19 @@ type ThemeLike = {
 	fg(color: string, text: string): string;
 	bold(text: string): string;
 };
+
+function getCodingAgentDistDir(): string {
+	let current = process.argv[1] ? path.dirname(path.resolve(process.argv[1])) : "";
+	for (let depth = 0; current && depth < 8; depth++) {
+		if (path.basename(current) === "dist" && path.basename(path.dirname(current)) === "pi-coding-agent") {
+			return current;
+		}
+		const parent = path.dirname(current);
+		if (parent === current) break;
+		current = parent;
+	}
+	throw new Error("Could not locate @earendil-works/pi-coding-agent dist directory from process.argv[1]");
+}
 
 function formatTokenCount(value: number | undefined): string {
 	if (!value || value <= 0) return "?";
@@ -104,8 +117,7 @@ function getVisibleRange(selectedIndex: number, total: number, maxVisible: numbe
 }
 
 async function loadInteractiveTheme(): Promise<ThemeLike> {
-	const packageEntry = require.resolve("@mariozechner/pi-coding-agent");
-	const themePath = path.join(path.dirname(packageEntry), "modes", "interactive", "theme", "theme.js");
+	const themePath = path.join(getCodingAgentDistDir(), "modes", "interactive", "theme", "theme.js");
 	const themeUrl = pathToFileURL(themePath).href;
 	const mod = (await import(themeUrl)) as { theme?: ThemeLike };
 	if (!mod.theme) throw new Error("Could not load interactive theme");
@@ -319,8 +331,7 @@ async function patchInteractiveMode(): Promise<void> {
 	const globalState = globalThis as Record<PropertyKey, unknown>;
 	if (globalState[key]) return;
 
-	const packageEntry = require.resolve("@mariozechner/pi-coding-agent");
-	const interactiveModePath = path.join(path.dirname(packageEntry), "modes", "interactive", "interactive-mode.js");
+	const interactiveModePath = path.join(getCodingAgentDistDir(), "modes", "interactive", "interactive-mode.js");
 	const interactiveModeUrl = pathToFileURL(interactiveModePath).href;
 	const mod = (await import(interactiveModeUrl)) as { InteractiveMode?: { prototype: InteractiveModePrototype } };
 	const prototype = mod.InteractiveMode?.prototype;

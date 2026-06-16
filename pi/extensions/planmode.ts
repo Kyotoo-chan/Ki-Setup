@@ -1,13 +1,13 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
-import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Box, Key, Text, matchesKey } from "@mariozechner/pi-tui";
-import { Type } from "typebox";
+import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Box, Key, Text, matchesKey } from "@earendil-works/pi-tui";
 
 const PLAN_FILE = ".pi/plan.md";
-const PLAN_QUESTIONS_TOOL = "plan_questions";
-const PLANNING_TOOLS = ["read", "bash", "write", PLAN_QUESTIONS_TOOL];
-const NORMAL_TOOLS = ["read", "bash", "edit", "write"];
+const QUESTION_TOOL = "ask_user_question";
+const PLAN_BASE_TOOLS = ["read", "bash", "write"];
+const NORMAL_BASE_TOOLS = ["read", "bash", "edit", "write"];
+const QUESTION_TOOL_GUIDANCE = `When using ${QUESTION_TOOL}, provide short headers plus 2-4 concrete options with concise labels and descriptions. Do not author your own "Other", "Type something.", or "Chat about this" options.`;
 
 const DESTRUCTIVE_PATTERNS = [
 	/\brm\b/i,
@@ -83,6 +83,18 @@ function isSafeCommand(command: string): boolean {
 	return !DESTRUCTIVE_PATTERNS.some((p) => p.test(command)) && SAFE_PATTERNS.some((p) => p.test(command));
 }
 
+function uniqueTools(names: string[]): string[] {
+	return [...new Set(names)];
+}
+
+function hasTool(pi: ExtensionAPI, name: string): boolean {
+	return pi.getAllTools().some((tool) => tool.name === name);
+}
+
+function withOptionalTool(pi: ExtensionAPI, names: string[], toolName: string): string[] {
+	return hasTool(pi, toolName) ? uniqueTools([...names, toolName]) : uniqueTools(names);
+}
+
 function planFileAbsolute(cwd: string): string {
 	return path.resolve(cwd, PLAN_FILE);
 }
@@ -113,41 +125,6 @@ type PlanMessageDetails = {
 	task?: string;
 	title?: string;
 };
-
-type PlanQuestion = {
-	label: string;
-	question: string;
-	suggestions: string[];
-};
-
-type PlanAnswer = {
-	label: string;
-	answer: string;
-	choiceIndex?: number;
-	wasCustom: boolean;
-};
-
-type PlanQuestionsResult = {
-	title?: string;
-	questions: PlanQuestion[];
-	answers: PlanAnswer[];
-	cancelled: boolean;
-};
-
-const PlanQuestionSchema = Type.Object({
-	label: Type.Optional(Type.String({ description: "Short tab label, e.g. Scope, Provider, Output" })),
-	question: Type.String({ description: "The full question shown to the user" }),
-	suggestions: Type.Array(Type.String({ description: "Suggested answers. Do not include an 'other' option." }), {
-		description: "Suggested answers for the user. The UI automatically appends a final free-text option.",
-	}),
-});
-
-const PlanQuestionsSchema = Type.Object({
-	title: Type.Optional(Type.String({ description: "Optional short title for the question set" })),
-	questions: Type.Array(PlanQuestionSchema, {
-		description: "Structured clarifying questions to ask before writing the plan",
-	}),
-});
 
 function stripInlineMarkdown(text: string): string {
 	return text
@@ -244,6 +221,21 @@ export default function planModeExtension(pi: ExtensionAPI) {
 	let taskPrompt = "";
 	let lastShownPlan = "";
 	let cleanupPending = false;
+	let normalTools = [...NORMAL_BASE_TOOLS];
+
+	function captureNormalTools() {
+		const activeTools = pi.getActiveTools();
+		normalTools = uniqueTools(activeTools.length > 0 ? activeTools : [...NORMAL_BASE_TOOLS]);
+	}
+
+	function normalToolSet(): string[] {
+		return uniqueTools(normalTools.length > 0 ? normalTools : [...NORMAL_BASE_TOOLS]);
+	}
+
+	function planningToolSet(): string[] {
+		const filtered = normalToolSet().filter((name) => name !== "edit");
+		return withOptionalTool(pi, uniqueTools([...filtered, ...PLAN_BASE_TOOLS]), QUESTION_TOOL);
+	}
 
 	pi.registerMessageRenderer<PlanMessageDetails>("planmode-plan", (message, options, theme) => {
 		if (typeof message.content !== "string") return undefined;
@@ -253,137 +245,6 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		const preview = [...text.split("\n").slice(0, 10), "", theme.fg("dim", "Ctrl+O to expand")].join("\n");
 		box.addChild(new Text(options.expanded ? text : preview));
 		return box;
-	});
-
-	pi.registerTool({
-		name: PLAN_QUESTIONS_TOOL,
-		label: "Plan Questions",
-		description: `Ask the user structured clarifying questions before writing ${PLAN_FILE}. Use this in plan mode when required information is missing.`,
-		promptSnippet: `Collect structured clarifying answers from the user before writing ${PLAN_FILE}`,
-		promptGuidelines: [
-			`Use ${PLAN_QUESTIONS_TOOL} in plan mode when required information is missing before writing ${PLAN_FILE}.`,
-			`When calling ${PLAN_QUESTIONS_TOOL}, provide short labels and concrete suggestions. Do not add your own "other" option because the tool already appends a final free-text choice.`,
-		],
-		parameters: PlanQuestionsSchema,
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			if (!ctx.hasUI) {
-				return {
-					content: [{ type: "text", text: "Structured clarifying questions require interactive mode." }],
-					details: { title: params.title, questions: [], answers: [], cancelled: true } satisfies PlanQuestionsResult,
-				};
-			}
-
-			const questions: PlanQuestion[] = params.questions
-				.map((question, index) => ({
-					label: question.label?.trim() || `Q${index + 1}`,
-					question: question.question.trim(),
-					suggestions: question.suggestions.map((suggestion) => suggestion.trim()).filter(Boolean),
-				}))
-				.filter((question) => question.question);
-
-			if (questions.length === 0) {
-				return {
-					content: [{ type: "text", text: "No valid clarifying questions were provided." }],
-					details: { title: params.title, questions: [], answers: [], cancelled: true } satisfies PlanQuestionsResult,
-				};
-			}
-
-			const title = params.title?.trim() || "Plan mode questions";
-			const answers: PlanAnswer[] = [];
-
-			for (let index = 0; index < questions.length; index++) {
-				const question = questions[index]!;
-				const options = [...question.suggestions, "Eigene Eingabe"];
-				const prompt = [`${title} (${index + 1}/${questions.length})`, question.label, "", question.question].join("\n");
-				const selection = await ctx.ui.select(prompt, options);
-
-				if (selection === undefined) {
-					return {
-						content: [{ type: "text", text: "The user cancelled the structured clarifying questions." }],
-						details: {
-							title: params.title?.trim() || undefined,
-							questions,
-							answers,
-							cancelled: true,
-						} satisfies PlanQuestionsResult,
-					};
-				}
-
-				if (selection === "Eigene Eingabe") {
-					let draft = "";
-					for (;;) {
-						const customAnswer = await ctx.ui.editor(prompt, draft);
-						if (customAnswer === undefined) {
-							return {
-								content: [{ type: "text", text: "The user cancelled the structured clarifying questions." }],
-								details: {
-									title: params.title?.trim() || undefined,
-									questions,
-									answers,
-									cancelled: true,
-								} satisfies PlanQuestionsResult,
-							};
-						}
-
-						draft = customAnswer;
-						const trimmed = customAnswer.trim();
-						if (!trimmed) {
-							ctx.ui.notify("Please enter a value before confirming.", "warning");
-							continue;
-						}
-
-						answers.push({
-							label: question.label,
-							answer: trimmed,
-							wasCustom: true,
-						});
-						break;
-					}
-					continue;
-				}
-
-				const choiceIndex = question.suggestions.findIndex((suggestion) => suggestion === selection);
-				answers.push({
-					label: question.label,
-					answer: selection,
-					choiceIndex: choiceIndex >= 0 ? choiceIndex + 1 : undefined,
-					wasCustom: false,
-				});
-			}
-
-			const result: PlanQuestionsResult = {
-				title: params.title?.trim() || undefined,
-				questions,
-				answers,
-				cancelled: false,
-			};
-			const summary = result.answers.map((answer) => `- ${answer.label}: ${answer.answer}`).join("\n");
-			return {
-				content: [{ type: "text", text: `Structured user answers:\n${summary}` }],
-				details: result,
-			};
-		},
-		renderCall(args, theme) {
-			const count = Array.isArray(args.questions) ? args.questions.length : 0;
-			const title = typeof args.title === "string" && args.title.trim() ? `${args.title.trim()} · ` : "";
-			return new Text(
-				`${theme.fg("toolTitle", theme.bold(`${PLAN_QUESTIONS_TOOL} `))}${theme.fg("muted", `${title}${count} question${count === 1 ? "" : "s"}`)}`,
-				0,
-				0,
-			);
-		},
-		renderResult(result, _options, theme) {
-			const details = result.details as PlanQuestionsResult | undefined;
-			if (!details) {
-				const text = result.content[0];
-				return new Text(text?.type === "text" ? text.text : "", 0, 0);
-			}
-			if (details.cancelled) {
-				return new Text(theme.fg("warning", "Clarifying questions cancelled"), 0, 0);
-			}
-			const lines = details.answers.map((answer) => `${theme.fg("success", "✓ ")}${theme.fg("accent", answer.label)}: ${answer.answer}`);
-			return new Text(lines.join("\n"), 0, 0);
-		},
 	});
 
 	function persist() {
@@ -397,10 +258,10 @@ export default function planModeExtension(pi: ExtensionAPI) {
 
 	function updateUi(ctx: ExtensionContext) {
 		if (active) {
-			pi.setActiveTools(PLANNING_TOOLS);
+			pi.setActiveTools(planningToolSet());
 			ctx.ui.setStatus("planmode", footerText(ctx));
 		} else {
-			pi.setActiveTools(NORMAL_TOOLS);
+			pi.setActiveTools(normalToolSet());
 			ctx.ui.setStatus("planmode", undefined);
 		}
 	}
@@ -423,6 +284,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 	}
 
 	async function enablePlanning(ctx: ExtensionContext, prompt = "", queuePrompt = false) {
+		captureNormalTools();
 		active = true;
 		taskPrompt = prompt.trim();
 		lastShownPlan = "";
@@ -439,7 +301,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		const planRequest = [
 			`Plan this task before implementation: ${taskPrompt}`,
 			`Work in planning mode only. Inspect the codebase read-only and identify missing information first.`,
-			`If anything is ambiguous, risky, or underspecified, ask clarifying questions with ${PLAN_QUESTIONS_TOOL} first. Provide short labels and concrete suggestions. Do not add your own "other" option because the tool already appends a free-text choice.`,
+			`If anything is ambiguous, risky, or underspecified, ask clarifying questions with ${QUESTION_TOOL} first. ${QUESTION_TOOL_GUIDANCE}`,
 			`Do not write ${PLAN_FILE} before those questions are answered or there are genuinely no open questions. Do not put unanswered open questions into the written plan.`,
 			`Only when there are no open questions, write the plan to ${PLAN_FILE}. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.`,
 			`Do not edit any file except ${PLAN_FILE}. After asking questions or after writing the plan, stop and wait for the user's next message.`,
@@ -454,7 +316,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 			"[PLAN MODE FOLLOW-UP]",
 			"The user's next message is a refinement to the active plan, not plan approval and not an implementation request.",
 			`Treat it as a request to update ${PLAN_FILE}. If the refinement is specific enough, overwrite ${PLAN_FILE} completely in this turn and then stop.`,
-			`Only if genuinely required information is still missing, ask clarifying questions with ${PLAN_QUESTIONS_TOOL} first and stop without implementing anything.`,
+			`Only if genuinely required information is still missing, ask clarifying questions with ${QUESTION_TOOL} first. ${QUESTION_TOOL_GUIDANCE}`,
 			`Do not edit any file except ${PLAN_FILE}.`,
 		].join("\n\n");
 
@@ -629,6 +491,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 			lastShownPlan = state.data.lastShownPlan ?? lastShownPlan;
 			cleanupPending = state.data.cleanupPending ?? cleanupPending;
 		}
+		captureNormalTools();
 		updateUi(ctx);
 	});
 
@@ -639,7 +502,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 			message: {
 				customType: "planmode-context",
 				content:
-					`[PLAN MODE ACTIVE]\nCurrent task: ${taskPrompt || "(will be provided by the user's next message)"}\n\nBefore making any code or file changes, do the following in order:\n1. Analyze the task and inspect the codebase read-only.\n2. Identify missing information first. If anything is ambiguous, risky, or underspecified, ask clarifying questions with ${PLAN_QUESTIONS_TOOL}.\n3. When using ${PLAN_QUESTIONS_TOOL}, provide short labels and concrete suggestions. Do not add your own "other" option because the tool already appends a free-text choice.\n4. Do not write ${PLAN_FILE} until those questions have been answered or there are genuinely no open questions. Do not put unanswered open questions into the written plan.\n5. Once there are no open questions, write a detailed implementation plan to ${PLAN_FILE} using the write tool. Overwrite that file completely when updating the plan.\n6. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.\n7. Do not edit any file except ${PLAN_FILE}. Do not use write/edit/bash to modify anything else.\n8. After asking questions or after writing the plan, stop and wait for the user's next message.\n9. If the user refines the request, treat it as a plan refinement request and overwrite ${PLAN_FILE} again before stopping instead of just discussing changes.\n10. Only start implementation after the user clearly approves the plan.\n\nCurrent working directory: ${ctx.cwd}\nPlan file absolute path: ${planAbs}`,
+					`[PLAN MODE ACTIVE]\nCurrent task: ${taskPrompt || "(will be provided by the user's next message)"}\n\nBefore making any code or file changes, do the following in order:\n1. Analyze the task and inspect the codebase read-only.\n2. Identify missing information first. If anything is ambiguous, risky, or underspecified, ask clarifying questions with ${QUESTION_TOOL}.\n3. ${QUESTION_TOOL_GUIDANCE}\n4. Do not write ${PLAN_FILE} until those questions have been answered or there are genuinely no open questions. Do not put unanswered open questions into the written plan.\n5. Once there are no open questions, write a detailed implementation plan to ${PLAN_FILE} using the write tool. Overwrite that file completely when updating the plan.\n6. The plan must include: goal, assumptions, open questions, affected files, step-by-step changes, validation steps, and risks.\n7. Do not edit any file except ${PLAN_FILE}. Do not use write/edit/bash to modify anything else.\n8. After asking questions or after writing the plan, stop and wait for the user's next message.\n9. If the user refines the request, treat it as a plan refinement request and overwrite ${PLAN_FILE} again before stopping instead of just discussing changes.\n10. Only start implementation after the user clearly approves the plan.\n\nCurrent working directory: ${ctx.cwd}\nPlan file absolute path: ${planAbs}`,
 				display: false,
 			},
 		};

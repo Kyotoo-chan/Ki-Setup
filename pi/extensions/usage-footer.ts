@@ -7,12 +7,12 @@ import type {
   ImageContent,
   Model,
   TextContent,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const LIMIT_STATE_TYPE = "usage-footer-state";
 const AUTO_COMPACT_THRESHOLD_PERCENT = 75;
