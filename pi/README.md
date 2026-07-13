@@ -22,11 +22,16 @@ Danach die in diesem Setup verwendeten Packages installieren:
 ```bash
 pi install npm:pi-claude-style-tools
 pi install npm:context-mode
+pi install npm:pi-web-access
 pi install npm:@juicesharp/rpiv-ask-user-question
 pi install npm:@juicesharp/rpiv-todo
+pi install npm:pi-subagents
+pi install npm:@dietrichgebert/ponytail
 ```
 
 Nach Package-Änderungen Pi einmal neu starten oder `/reload` ausführen.
+
+Optional die empfohlenen Defaults aus [`settings.json`](./settings.json) nach `~/.pi/agent/settings.json` übernehmen.
 
 ## `AGENTS.md` in diesem Ordner
 
@@ -43,6 +48,7 @@ Die geteilten Rollenprofile liegen zusätzlich in [`../agents/main.md`](../agent
 | [`extensions/usage-footer.ts`](./extensions/usage-footer.ts) | Footer, Auto-Compact und `/reset` |
 | [`extensions/model-selector.ts`](./extensions/model-selector.ts) | Modellwahl und Denktiefe |
 | [`extensions/btw.ts`](./extensions/btw.ts) | Zusatzhinweis für den laufenden Task |
+| [`settings.json`](./settings.json) | Empfohlene Modell-Defaults und Package-Liste für `~/.pi/agent/settings.json` |
 
 ## Verwendete Pi-Packages
 
@@ -50,8 +56,11 @@ Die geteilten Rollenprofile liegen zusätzlich in [`../agents/main.md`](../agent
 |---|---|
 | `pi-claude-style-tools` | Claude-Code-artige Tool-Darstellung und Vorschauen in Pi |
 | `context-mode` | Zusätzliche `ctx_*`-Tools für Kontextschonung, Analyse, Suche und Dokumenten-/Output-Verarbeitung |
+| `pi-web-access` | Websuche, URL-Fetching, GitHub-Cloning, PDF- und Video-Analyse |
 | `@juicesharp/rpiv-ask-user-question` | Strukturiertes Rückfrage-Tool `ask_user_question` mit auswählbaren Optionen |
 | `@juicesharp/rpiv-todo` | `todo`-Tool plus `/todos`; kann vom Modell selbst für Mehrschritt-Aufgaben genutzt werden |
+| `pi-subagents` | Delegation an Subagenten mit Chains, Parallel-Läufen und gespeicherten Workflows |
+| `@dietrichgebert/ponytail` | Lazy-Senior-Dev-Modus mit `/ponytail`-Befehlen und Always-on-Regeln |
 
 ## Lokale Pi-Befehle
 
@@ -72,6 +81,11 @@ Diese Befehle ergänzen Pi um schnelle Alltagsfunktionen: planen, Kontext nachre
 | `todo` | Aufgabenliste für Mehrschritt-Arbeit; kann vom Modell selbst gepflegt werden | `@juicesharp/rpiv-todo` |
 | `/todos` | Zeigt die aktuelle Todo-Liste an | `@juicesharp/rpiv-todo` |
 | `ctx_*` | Kontextsparende Analyse-, Such- und Ausführungs-Tools | `context-mode` |
+| `web_search` | Websuche mit Fallback-Kette (Exa, OpenAI, Brave, …) | `pi-web-access` |
+| `fetch_content` | URL-Fetch, GitHub-Clone, PDF- und Video-Analyse | `pi-web-access` |
+| `subagent` | Aufgaben an fokussierte Child-Sessions delegieren | `pi-subagents` |
+| `/ponytail` | Intensität des Ponytail-Modus setzen (`lite`, `full`, `ultra`, `off`) | `@dietrichgebert/ponytail` |
+| `/ponytail-review` | Diff auf Over-Engineering prüfen | `@dietrichgebert/ponytail` |
 
 Zusätzliche Shortcuts:
 
@@ -96,6 +110,10 @@ Package-basierte Erweiterungen werden mit `pi install ...` installiert. Dadurch 
 
 ## Modell- und Denktiefen-Strategie
 
-- Standard-Denktiefe: meist `medium`, manchmal `high`
-- Standard-Modell für normales Coding: aktuelles Sonnet oder ein gutes GPT-Modell der Vorgängergeneration
-- Für sehr komplexe Aufgaben: aktuelles Opus oder aktuelles GPT
+| Rolle | Modell | Denktiefe |
+|---|---|---|
+| GPT-Default | `gpt-5.6-sol` | `medium` — höher meist unnötig |
+| Anthropic-Default | `claude-opus-4-8` | `medium` |
+| Sehr komplex | aktuelles Opus oder GPT | `high` nur bei Bedarf |
+
+Die Defaults stehen in [`settings.json`](./settings.json) und gehören nach `~/.pi/agent/settings.json`.
