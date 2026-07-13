@@ -1,10 +1,10 @@
-# Agent Rules
+# Claude Rules
 
-Antworte in der Sprache der Eingabe. Kompakt und direkt — keine Präambeln, kein Fülltext.
+Antworte in der Sprache der Eingabe. Kompakt und direkt — keine Präambeln, kein Fülltext. Kein Emoji. Keine Kommentare im Code, außer wenn das *Warum* nicht offensichtlich ist.
 
 ## Vor dem Coden
 
-- Annahmen benennen. Bei Unklarheit: `ask_user_question` nutzen, nicht raten.
+- Annahmen benennen. Bei Unklarheit fragen, nicht raten.
 - Unklare Aufgabe: erst `/plan`, dann implementieren.
 - Einfacheren Weg nennen, wenn einer existiert.
 - Nur das bauen, was angefragt wurde.
@@ -25,10 +25,16 @@ Nicht faul bei: Verstehen des Problems, Validierung an Trust Boundaries, Fehlerb
 
 - Nur anfassen, was die Aufgabe braucht. Stil des bestehenden Codes matchen.
 - Jede geänderte Zeile muss zur Anfrage zurückführbar sein.
-- Mehrschritt-Aufgaben: `todo` pflegen.
+- Orphans aus eigenen Änderungen aufräumen. Bestehenden Dead Code nur erwähnen, nicht löschen.
+
+## Ziele
+
+Aufgaben in prüfbare Ziele übersetzen und bis zur Verifikation weiterarbeiten:
+
+- „Validation hinzufügen“ → Tests für ungültige Inputs, dann grün
+- „Bug fixen“ → Test der den Bug reproduziert, dann grün
 
 ## Modelle
 
-- GPT-Default: `gpt-5.6-sol`, Denktiefe `medium`
-- Anthropic-Default: `claude-opus-4-8`, Denktiefe `medium`
-- `high` nur bei echt komplexen Aufgaben
+- Default: **Claude Opus 4.8**
+- GPT-Fallback: `gpt-5.6-sol`, Denktiefe `medium` — höher meist unnötig

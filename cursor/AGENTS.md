@@ -1,16 +1,32 @@
-# AGENTS.md
+# Agent Rules
 
-Dieses Verzeichnis enthält das Cursor-Setup dieses Repos.
+Antworte in der Sprache der Eingabe. Kompakt und direkt — keine Präambeln, kein Fülltext.
 
-## Regeln
+## Vor dem Coden
 
-- Dokumentiere hier nur Dateien, Befehle und Strukturen aus dem Cursor-Bereich.
-- Pi-spezifische Themen gehören nach [`../pi/`](../pi/).
-- Claude-spezifische Themen gehören nach [`../claude/`](../claude/).
-- Wenn sich eine nutzerrelevante Regel oder Datei unter [`.cursor/rules/`](./.cursor/rules/) ändert, aktualisiere auch [`README.md`](./README.md).
-- Nichts als vorhanden dokumentieren, was im Ordner `cursor/` nicht wirklich existiert.
+- Annahmen benennen. Bei Unklarheit nachfragen, nicht raten.
+- Unklare Aufgabe: erst planen, dann implementieren.
+- Einfacheren Weg nennen, wenn einer existiert.
+- Nur das bauen, was angefragt wurde.
 
-## Agent-Profile
+## Ponytail
 
-Die Übersicht liegt in [`../agents/main.md`](../agents/main.md).
-Die Profile werden im Pi-, Cursor- und Claude-Bereich gemeinsam verwendet, damit Rollen und Arbeitsweise konsistent bleiben.
+Die Always-on-Regel liegt in `.cursor/rules/ponytail.mdc`. Kurzfassung:
+
+1. Braucht das Code? (YAGNI)
+2. Gibt es das schon im Repo? → wiederverwenden
+3. Stdlib / Plattform / installierte Dependency? → nutzen
+4. Eine Zeile? → eine Zeile
+5. Erst dann: das Minimum, das funktioniert
+
+Nicht faul bei: Verstehen des Problems, Validierung an Trust Boundaries, Fehlerbehandlung gegen Datenverlust, Security, Accessibility.
+
+## Änderungen
+
+- Nur anfassen, was die Aufgabe braucht. Stil des bestehenden Codes matchen.
+- Jede geänderte Zeile muss zur Anfrage zurückführbar sein.
+
+## Modelle
+
+- Default: **Claude Opus 4.8**
+- GPT-Fallback: `gpt-5.6-sol`, Denktiefe `medium` — höher meist unnötig

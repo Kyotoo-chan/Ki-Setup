@@ -7,8 +7,15 @@
 ## Installation
 
 1. [Cursor](https://cursor.com/download) installieren
-2. [`.cursor/rules/ponytail.mdc`](./.cursor/rules/ponytail.mdc) ins Projektroot kopieren (oder global unter `~/.cursor/rules/` ablegen)
-3. Optional: [`../agents/main.md`](../agents/main.md) als Rollenreferenz nutzen
+2. Regeln kopieren (PowerShell, aus dem Repo-Root):
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.cursor\rules" | Out-Null
+Copy-Item -Force "cursor\.cursor\rules\ponytail.mdc" "$env:USERPROFILE\.cursor\rules\ponytail.mdc"
+```
+
+3. Optional [`AGENTS.md`](./AGENTS.md) ins Projektroot kopieren
+4. In Cursor: **Settings → Models** → **Claude Opus 4.8** als Default
 
 ## Ponytail
 
@@ -56,5 +63,5 @@ cursor/
 
 | Datei | Zweck |
 |---|---|
-| [`AGENTS.md`](./AGENTS.md) | Regeln für den Cursor-Bereich |
+| [`AGENTS.md`](./AGENTS.md) | Agent-Regeln zum Kopieren ins Projektroot |
 | [`.cursor/rules/ponytail.mdc`](./.cursor/rules/ponytail.mdc) | Ponytail Always-on-Regel (aus GitHub) |

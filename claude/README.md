@@ -7,22 +7,22 @@
 
 ## Installation
 
-PowerShell
+PowerShell:
+
 ```powershell
 irm https://claude.ai/install.ps1 | iex
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude" | Out-Null
+Copy-Item -Recurse -Force "claude\.claude\*" "$env:USERPROFILE\.claude\"
+Copy-Item -Force "claude\CLAUDE.md" ".\CLAUDE.md"
 ```
 
-CMD
+CMD:
+
 ```cmd
 curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd
 ```
 
-## Empfohlene Nutzung
-
-1. Claude Code installieren
-2. Dateien aus [`.claude/`](./.claude/) in dein Claude-Setup übernehmen
-3. [`templates/CLAUDE.project.md`](./templates/CLAUDE.project.md) als `CLAUDE.md` ins Projektroot kopieren
-4. [`./.claude/andrej_karpathy_CLAUDE.md`](./.claude/andrej_karpathy_CLAUDE.md) nur als Referenz nutzen
+`CLAUDE.md` ins Projektroot kopieren (siehe PowerShell oben). [`./.claude/andrej_karpathy_CLAUDE.md`](./.claude/andrej_karpathy_CLAUDE.md) nur als Referenz nutzen.
 
 ## Bewusst nicht im Repo
 
@@ -44,6 +44,7 @@ Diese Dinge sind meist persönlich oder projektabhängig und sollten lokal oder 
 ```text
 claude/
 ├── README.md
+├── CLAUDE.md
 ├── .claude/
 │   ├── CLAUDE.md
 │   ├── andrej_karpathy_CLAUDE.md
@@ -56,10 +57,10 @@ claude/
 
 | Datei | Zweck |
 |---|---|
-| [`./.claude/CLAUDE.md`](./.claude/CLAUDE.md) | Einstieg und Paketkonventionen |
+| [`CLAUDE.md`](./CLAUDE.md) | Agent-Regeln zum Kopieren ins Projektroot |
 | [`./.claude/settings.json`](./.claude/settings.json) | Auto-Compact ab 75 % und weitere Settings |
 | [`./.claude/andrej_karpathy_CLAUDE.md`](./.claude/andrej_karpathy_CLAUDE.md) | Referenz, nicht die Kopiervorlage |
-| [`./templates/CLAUDE.project.md`](./templates/CLAUDE.project.md) | Schlanke Startvorlage für projektspezifische Claude-Regeln |
+| [`./templates/CLAUDE.project.md`](./templates/CLAUDE.project.md) | Ältere Vorlage; [`CLAUDE.md`](./CLAUDE.md) bevorzugen |
 
 ## Auto-Compact
 

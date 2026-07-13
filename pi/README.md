@@ -29,21 +29,23 @@ pi install npm:pi-subagents
 pi install npm:@dietrichgebert/ponytail
 ```
 
+Extensions und Settings kopieren (PowerShell, aus dem Repo-Root):
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.pi\agent\extensions" | Out-Null
+Copy-Item -Recurse -Force "pi\extensions\*" "$env:USERPROFILE\.pi\agent\extensions\"
+Copy-Item -Force "pi\settings.json" "$env:USERPROFILE\.pi\agent\settings.json"
+```
+
+Optional [`AGENTS.md`](./AGENTS.md) ins Projektroot kopieren.
+
 Nach Package-Änderungen Pi einmal neu starten oder `/reload` ausführen.
-
-Optional die empfohlenen Defaults aus [`settings.json`](./settings.json) nach `~/.pi/agent/settings.json` übernehmen.
-
-## `AGENTS.md` in diesem Ordner
-
-[`AGENTS.md`](./AGENTS.md) beschreibt die Regeln für den allgemeinen Pi-Bereich.
-Wenn du die Datei in ein Projekt übernimmst, passe sie an das Projekt an.
-Die geteilten Rollenprofile liegen zusätzlich in [`../agents/main.md`](../agents/main.md).
 
 ## Kerndateien
 
 | Datei | Zweck |
 |---|---|
-| [`AGENTS.md`](./AGENTS.md) | Regeln für das allgemeine Pi-Setup |
+| [`AGENTS.md`](./AGENTS.md) | Agent-Regeln zum Kopieren ins Projektroot |
 | [`extensions/planmode.ts`](./extensions/planmode.ts) | Plan Mode; nutzt bei Bedarf `ask_user_question` aus `@juicesharp/rpiv-ask-user-question` |
 | [`extensions/usage-footer.ts`](./extensions/usage-footer.ts) | Footer, Auto-Compact und `/reset` |
 | [`extensions/model-selector.ts`](./extensions/model-selector.ts) | Modellwahl und Denktiefe |
